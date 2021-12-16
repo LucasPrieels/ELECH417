@@ -1,10 +1,12 @@
 import socket, time
 
-def connect_to_server():
+def connect_to_server(ip):
     s = socket.socket()    # Remote socket
     host = socket.gethostname() # Remote address (here same as local since local tests)
     port = 9999 # Remote port number
-    s.connect((host,port))
+    if ip == "-1": # If local
+        ip = host
+    s.connect((ip,port))
     return s
 
 def login(s):
@@ -47,8 +49,9 @@ def signup(s):
         raise Exception("Unexpected answer")
 
 try:
+    ip = "-1";#"192.168.1.30" # IP address of the remote server, or -1 for local
     while True:
-        server_socket = connect_to_server()
+        server_socket = connect_to_server(ip)
         log = input("Do you want to sign up (0) or login (1)?")
         if log == "0":
             signup(server_socket)
