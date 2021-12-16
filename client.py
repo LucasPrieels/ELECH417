@@ -8,25 +8,51 @@ def connect_to_server():
     return s
 
 def login(s):
+    print("####### LOGIN #######")
     usr = input("Username : ")
     pswd = input("Password : ")
 
+    s.send(str.encode("0")) # Code stating we want to login
     s.send(str.encode(str(usr) + " " + str(pswd))) # str.encode() to transform the string into bytes
     
     ans = bytes.decode(s.recv(1)) # 1 byte is enough
     if ans == "0":
-        print("Username unkown")
+        print("Username unkown\n")
         return -1
     elif ans == "1":
-        print("Password incorrect")
+        print("Password incorrect\n")
         return -1
     elif ans == "2":
-        print("Connection successful")
+        print("Connection successful\n")
         return usr
     else:
-        print("Error")
+        raise Exception("Unexpected answer")
+        
+def signup(s):
+    print("####### SIGNUP #######")
+    usr = input("Username : ")
+    pswd = input("Password : ")
+    
+    s.send(str.encode("1")) # Code stating we want to sign up
+    s.send(str.encode(str(usr) + " " + str(pswd))) # str.encode() to transform the string into bytes
+    
+    ans = bytes.decode(s.recv(1)) # 1 byte is enough, it's the status of the query
+    if ans == "0":
+        print("Username already used\n")
         return -1
+    elif ans == "1":
+        print("Signup successful\n")
+        return usr
+    else:
+        raise Exception("Unexpected answer")
 
-server_socket = connect_to_server()
-login(server_socket)
-server_socket.close()
+try:
+    while True:
+        server_socket = connect_to_server()
+        log = input("Do you want to sign up (0) or login (1)?")
+        if log == "0":
+            signup(server_socket)
+        elif log == "1":
+            login(server_socket)
+finally:
+    server_socket.close()
