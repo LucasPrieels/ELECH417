@@ -1,5 +1,7 @@
 import socket
 
+clients = {} # List of clients connected with their username and their socket
+
 def parse_credentials_file():
     credentials = {}
     f = open("credentials.txt", "r")
@@ -16,7 +18,7 @@ def create_listen_socket(port):
     s.bind((host,port)) # Bind with the address
 
     print("Socket created on host " + host + ":" + str(port))
-    s.listen(5) # Max number of clients that can be connected at the same time to this socket
+    s.listen(5) # Max number of clients queued
     
     return s
     
@@ -63,10 +65,13 @@ while True:
     print ("Connection from address " + str(addr))
     try:
         query = bytes.decode(conn.recv(1)) # Waiting for query
+        print(query)
         if query == "0":
             usr = login()
         elif query == "1":
             usr = signup()
+        elif query == "":
+            continue # Connection closed by the client
         else:
             raise Exception("Unexpected query")
     finally:

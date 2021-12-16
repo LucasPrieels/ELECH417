@@ -9,15 +9,16 @@ def connect_to_server(ip):
     s.connect((ip,port))
     return s
 
-def login(s):
+def login(ip):
     print("####### LOGIN #######")
     usr = input("Username : ")
     pswd = input("Password : ")
+    server_socket = connect_to_server(ip)
 
-    s.send(str.encode("0")) # Code stating we want to login
-    s.send(str.encode(str(usr) + " " + str(pswd))) # str.encode() to transform the string into bytes
+    server_socket.send(str.encode("0")) # Code stating we want to login
+    server_socket.send(str.encode(str(usr) + " " + str(pswd))) # str.encode() to transform the string into bytes
     
-    ans = bytes.decode(s.recv(1)) # 1 byte is enough
+    ans = bytes.decode(server_socket.recv(1)) # 1 byte is enough
     if ans == "0":
         print("Username unkown\n")
         return -1
@@ -30,15 +31,16 @@ def login(s):
     else:
         raise Exception("Unexpected answer")
         
-def signup(s):
+def signup(ip):
     print("####### SIGNUP #######")
     usr = input("Username : ")
     pswd = input("Password : ")
+    server_socket = connect_to_server(ip)
     
-    s.send(str.encode("1")) # Code stating we want to sign up
-    s.send(str.encode(str(usr) + " " + str(pswd))) # str.encode() to transform the string into bytes
+    server_socket.send(str.encode("1")) # Code stating we want to sign up
+    server_socket.send(str.encode(str(usr) + " " + str(pswd))) # str.encode() to transform the string into bytes
     
-    ans = bytes.decode(s.recv(1)) # 1 byte is enough, it's the status of the query
+    ans = bytes.decode(server_socket.recv(1)) # 1 byte is enough, it's the status of the query
     if ans == "0":
         print("Username already used\n")
         return -1
@@ -48,14 +50,13 @@ def signup(s):
     else:
         raise Exception("Unexpected answer")
 
-try:
-    ip = "-1";#"192.168.1.30" # IP address of the remote server, or -1 for local
-    while True:
-        server_socket = connect_to_server(ip)
-        log = input("Do you want to sign up (0) or login (1)?")
-        if log == "0":
-            signup(server_socket)
-        elif log == "1":
-            login(server_socket)
-finally:
-    server_socket.close()
+#try:
+ip = "-1"# 192.168.1.30" # IP address of the remote server, or -1 for local
+while True:
+    log = input("Do you want to sign up (0) or login (1)?")
+    if log == "0":
+        signup(ip)
+    elif log == "1":
+        login(ip)
+#finally:
+    #server_socket.close()
