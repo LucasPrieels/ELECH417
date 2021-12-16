@@ -1,5 +1,14 @@
 import socket
 
+def parse_credentials_file():
+    credentials = {}
+    f = open("credentials.txt", "r")
+    for line in f:
+        usr, pswd = (line.strip()).split(' ')
+        credentials[usr] = pswd
+    print(credentials)
+    return credentials
+
 def create_listen_socket(port):
     s = socket.socket() # Create a socket object
     host = socket.gethostname() # Current machine name
@@ -11,7 +20,7 @@ def create_listen_socket(port):
     
     return s
     
-def login():
+def login(credentials):
     received = bytes.decode(conn.recv(1024)).split(' ')
     usr = received[0]
     pswd = received[1]
@@ -27,7 +36,7 @@ def login():
         
     return usr;
 
-credentials = {"usr1":"pass1", "usr2":"pass2", "usr3":"pass3"}
+credentials = parse_credentials_file()
 
 listen_socket = create_listen_socket(9999) # Port number
 
@@ -35,7 +44,7 @@ while True:
     conn,addr = listen_socket.accept() # Wait for connection on this socket
     print ("Connection from address " + str(addr))
     try:
-        usr = login()
+        usr = login(credentials)
         if usr == -1:
             print("Login unsucessful")
         else:
