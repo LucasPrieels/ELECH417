@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 import socket, time
 
 def connect_to_server(ip, remote_port):
@@ -67,5 +69,10 @@ while True:
                 server_main_socket.send(str.encode(data))
                 if data == ".": # Stop communication
                     break
+    elif log == "666" :
+        server_main_socket = connect_to_server(ip, 10000) # The server port number to connect is 10000
+        
+        server_main_socket.send(str.encode(log))
+
 #finally:
     #server_main_socket.close()

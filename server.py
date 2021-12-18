@@ -1,6 +1,8 @@
+#!/usr/bin/python3
+
 import socket, random
 from _thread import *
-
+from connect import connect, disconnect
 clients = {} # List of clients connected with their username and their socket
 current_port = 0
 
@@ -81,8 +83,10 @@ def server_listener(main_connection, usr): # Listen to messages arriving from a 
         print("From user " + usr + " : " + data)
 
 main_socket = create_new_socket(10000) # Main socket, used by the server to send data and to listen to new connections. Port number is 10 000 by definition
+db_connection = connect()
 
-while True:
+query = ""
+while True :
     main_connection,address = main_socket.accept() # Wait for connection on this socket
     print("Connection from address " + str(address))
     #try:
@@ -97,8 +101,13 @@ while True:
         usr = signup(main_connection)
     elif query == "":
         continue # Connection closed by the client
+    elif query == "6" :
+        disconnect(db_connection)
     else:
+        print(query)
         raise Exception("Unexpected query")
     #finally:
         #conn.close()
         #print("Connection closed")
+
+disconnect(db_connection)
