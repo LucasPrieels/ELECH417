@@ -27,6 +27,7 @@ def modulus(p, q):
 
 def toitent(p, q):
     z = (p - 1) * (q - 1)
+    print('saltzez')
     return z
 
 
