@@ -45,6 +45,7 @@ def get_users_from_db() :
     cred = []
     for user in cur.fetchall() :
         cred.append(user[0])
+    cur.close()
     return cred
 
 
@@ -84,22 +85,59 @@ def signup(main_connection):
         main_connection.send(str.encode("1"))
         print("Signup successful")
         return usr
-    
+
+
+def authentication(username, password) :
+    """
+    Gets the password from the DB and verifies it matches the entry
+    """
+    ## Here we assume username is in the DB
+    global db_connection
+    cur = db_connection.cursor()
+    query = """
+    SELECT password FROM users WHERE username = '{}'
+    """.format(username)
+    cur.execute(query)
+
+    res = cur.fetchone()[0]
+    print(password, res)
+    return password == res
+
+def update_last_login(username) :
+    # Updates the "last_login" timestamp attribute of the username in the DB
+    global db_connection
+    cur = db_connection.cursor()
+    query = """
+    UPDATE users
+    SET last_login = now()
+    WHERE username = '{}'
+    """.format(username)
+    cur.execute(query)
+
+    # A modification has been done : commit 
+    db_connection.commit()
+    return
+
 def login(main_connection):
-    credentials = parse_credentials_file()
+    credentials = get_users_from_db()
     
     received = bytes.decode(main_connection.recv(1024)).split(' ')
     usr = received[0]
     pswd = received[1]
+    
     if usr not in credentials:
         main_connection.send(str.encode("0"))
         print("Login unsucessful")
         return -1, -1
-    elif credentials[usr] != pswd:
+
+    pw_check = authentication(usr, pswd)    
+    if not pw_check:
         main_connection.send(str.encode("1"))
         print("Login unsucessful")
         return -1, -1
     else:
+        update_last_login(usr)
+
         main_connection.send(str.encode("2"))
         print("Login successful")
         return usr, new_socket_client(main_connection)
