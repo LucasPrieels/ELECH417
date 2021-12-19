@@ -33,7 +33,7 @@ def login():
     resp = tk.Label(root, text='', font=(font, 10, 'bold'), bg='white')
     resp.place(x=10, y=250)
 
-    submit =tk.Button(root, text='Submit', font=(font, 10, 'bold'), width=14, bg='green', command=chat, fg='black')
+    submit =tk.Button(root, text='Submit', font=(font, 10, 'bold'), width=14, bg='green', command=lambda: print((pass_entry.get() + user_entry.get())), fg='black')
     submit.place(x=10, y=180)
 
     tk.Label(root, text='Don\'t Have An Account ?', bg='white', font = (font, 10, "normal")).place(x=30, y=210)

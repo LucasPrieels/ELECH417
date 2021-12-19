@@ -2,8 +2,12 @@
 
 import socket, time
 from _thread import *
+import tkinter as tk
+
+font = "Comic Sans Ms"
 
 disconnection = False # It is put to True when the user wants to be disconnected
+
 
 def connect_to_server(ip, remote_port):
     s = socket.socket() # Remote socket
@@ -11,8 +15,10 @@ def connect_to_server(ip, remote_port):
     if ip == "-1": # If local
         ip = host
     print("Remote port : " + str(remote_port))
+
     s.connect((ip, remote_port))
     return s
+
 
 def login(ip):
     print("####### LOGIN #######")
@@ -22,7 +28,7 @@ def login(ip):
 
     server_main_socket.send(str.encode("0")) # Code stating we want to login
     server_main_socket.send(str.encode(str(usr) + " " + str(pswd))) # str.encode() to transform the string into bytes
-    
+
     ans = bytes.decode(server_main_socket.recv(1)) # 1 byte is enough
     if ans == "0":
         print("Username unkown\n")
@@ -37,34 +43,12 @@ def login(ip):
         return usr, server_main_socket, server_listen_socket
     else:
         raise Exception("Unexpected answer")
-        
+
+
 def check_credentials(usr, pswd):
     if (usr[0]).isdigit() or len(usr) > 10: # A username can't start with a digit or be longer than 10 characters
         return False
     return True
-        
-def signup(ip):
-    valid_credentials = False
-    while not valid_credentials: # While the credentials are not valid we ask for them again
-        print("####### SIGNUP #######")
-        usr = input("Username : ")
-        pswd = input("Password : ")
-        valid_credentials = check_credentials(usr, pswd)
-        
-    server_main_socket = connect_to_server(ip, 10000) # The server port number to connect is 10000
-    
-    server_main_socket.send(str.encode("1")) # Code stating we want to sign up
-    server_main_socket.send(str.encode(str(usr) + " " + str(pswd))) # str.encode() to transform the string into bytes
-    
-    ans = bytes.decode(server_main_socket.recv(1)) # 1 byte is enough, it's the status of the query
-    if ans == "0":
-        print("Username already used\n")
-        return -1
-    elif ans == "1":
-        print("Signup successful\n")
-        return usr
-    else:
-        raise Exception("Unexpected answer")
 
 def listen_for_input(): # Listen for the client's input and sends it to the server
     global disconnection
@@ -87,7 +71,8 @@ def listen_for_input(): # Listen for the client's input and sends it to the serv
             server_listen_socket.send(str.encode(data)) # Send message
             if data == ".": # Stop communication with this user
                 break
-            
+
+
 def listen_for_messages(): # Listen from messages from the server and displays them
     sender = bytes.decode(server_main_socket.recv(10))
     while True:
@@ -97,10 +82,143 @@ def listen_for_messages(): # Listen from messages from the server and displays t
         data = bytes.decode(server_main_socket.recv(2048))
         print("From user " + sender + " : " + data)
 
+#GUI
+
+
+def init_gui():
+    global root
+    root = tk.Tk()
+    root.geometry('400x150')
+    root.title('login signup')
+
+    tk.Button(root, text="Login", command=login_gui).grid(row=4, column=0)
+    tk.Button(root, text="Register", command=register_gui).grid(row=4, column=2)
+
+    root.mainloop()
+
+
+def login_gui():
+    global root
+    root.destroy()
+    root = tk.Tk()
+
+    root.title('Login')
+    root.geometry('300x300+220+170')
+    root.configure(bg='white')
+    root.resizable(False, False)
+
+    log_label = tk.Label(root, text='Login', width=20, height=1, font=(font, 20, 'bold'))
+    log_label.pack()
+
+    u = tk.Label(root, text='Username :', font=(font, 14, 'bold'), bg='white')
+    u.place(x=10, y=50)
+
+    user_entry = tk.Entry(root, font=(font, 10, 'bold'), width=25, bg='powder blue')
+    user_entry.place(x=10, y=80)
+
+    p = tk.Label(root, text='Password :', font=(font, 14, 'bold'), bg='white')
+    p.place(x=10, y=110)
+
+    pass_entry = tk.Entry(root, show='*', font=(font, 10, 'bold'), width=25, bg='powder blue')
+    pass_entry.place(x=10, y=140)
+
+    resp = tk.Label(root, text='', font=(font, 10, 'bold'), bg='white')
+    resp.place(x=10, y=250)
+
+    def login(ip):
+
+        usr = user_entry.get()
+        pswd = pass_entry.get()
+
+        server_main_socket = connect_to_server(ip, 10000)  # The server port number to connect is 10000
+        server_main_socket.send(str.encode("0"))  # Code stating we want to login
+        server_main_socket.send(str.encode(str(usr) + " " + str(pswd)))  # str.encode() to transform the string into bytes
+
+        ans = bytes.decode(server_main_socket.recv(1))  # 1 byte is enough
+        if ans == "0":
+            resp.configure(text="username unknown", fg='red')
+        elif ans == "1":
+            resp.configure(text="incorrect password", fg='red')
+        elif ans == "2":
+            resp.configure(text=f'Login Successful\n Welcome {usr} ', fg='green')
+            remote_port = bytes.decode(server_main_socket.recv(
+                4))  # 4 bytes for a port number between 2000 and 3000 (in string format so each character takes a byte)
+            server_listen_socket = connect_to_server(ip,
+                                                     int(remote_port))  # Connect to the new port specific for this client, given by the server
+        else:
+            raise Exception("Unexpected answer")
+
+    submit = tk.Button(root, text='Submit', font=(font, 10, 'bold'), width=14, bg='green', command= lambda: login(ip), fg='black')
+    submit.place(x=10, y=180)
+
+    tk.Label(root, text='Don\'t Have An Account ?', bg='white', font = (font, 10, "normal")).place(x=30, y=210)
+
+    tk.Button(root, text='Register', font=(font, 10, 'underline'), bg='white', fg='blue', command = register_gui).place(x=200, y=210)
+
+    resp = tk.Label(root, text='', font=('Arial Black', 10, 'bold'), bg='white')
+    resp.place(x=10, y=250)
+
+    root.mainloop()
+
+
+def chat_gui():
+ print("zeubi")
+
+
+def register_gui():
+    global root
+    root.destroy()
+    root = tk.Tk()
+
+    root.title('Register')
+    root.geometry('300x300+220+170')
+    root.configure(bg='white')
+    root.resizable(False, False)
+
+    log_label = tk.Label(root, text='Register', width=20, height=1, font=(font, 20, 'bold'))
+    log_label.pack()
+
+    u = tk.Label(root, text='Username :', font=(font, 14, 'bold'), bg='white')
+    u.place(x=10, y=50)
+
+    user_entry = tk.Entry(root, font=(font, 10, 'bold'), width=25, bg='powder blue')
+    user_entry.place(x=10, y=80)
+
+    p = tk.Label(root, text='Password :', font=(font, 14, 'bold'), bg='white')
+    p.place(x=10, y=110)
+
+    pass_entry = tk.Entry(root, show='*', font=(font, 10, 'bold'), width=25, bg='powder blue')
+    pass_entry.place(x=10, y=140)
+
+    resp = tk.Label(root, text='', font=(font, 10, 'bold'), bg='white')
+    resp.place(x=10, y=250)
+
+    submit = tk.Button(root, text='Submit', font=(font, 10, 'bold'), width=14, bg='green', command = login,
+                       fg='black')
+    submit.place(x=10, y=180)
+
+    tk.Label(root, text='Already Have an account ?', bg='white', font=(font, 10, "normal")).place(x=30, y=210)
+
+    tk.Button(root, text='login', font=(font, 10, 'underline'), bg='white', fg='blue',
+              command=login).place(x=200, y=210)
+
+    root.bind('<Return>', init_gui)
+
+
+    resp = tk.Label(root, text='', font=('Arial Black', 10, 'bold'), bg='white')
+    resp.place(x=10, y=250)
+
+    root.mainloop()
+
+
+
+
 #try:
-ip = "-1"# 192.168.1.30" # IP address of the remote server, or -1 for local
+ip = "-1" # 192.168.1.30" # IP address of the remote server, or -1 for local
 while True:
-    log = input("Do you want to sign up (0) or login (1)?")
+    init_gui()
+    print("sheesh")
+    log = "0"
     if log == "0":
         signup(ip)
     elif log == "1":
