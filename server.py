@@ -37,22 +37,52 @@ def new_socket_client(main_connection): # Associate a new port number and socket
     socket = create_new_socket(current_port)
     main_connection.send(str.encode(str(current_port))) # Send the port number to the client
     return socket
-    
+
+def get_users_from_db() :
+    global db_connection
+    cur = db_connection.cursor()
+    cur.execute("SELECT username FROM users ;")
+    cred = []
+    for user in cur.fetchall() :
+        cred.append(user[0])
+    return cred
+
+
 def signup(main_connection):
-    credentials = parse_credentials_file()
+    global db_connection
+    
+    # Whatever the credentials are (valid or not), we create a cursor to query the DB
+    cur = db_connection.cursor()
+
+    # credentials = parse_credentials_file()
+    # New version, using DB
+    credentials = get_users_from_db()
 
     received = bytes.decode(main_connection.recv(1024)).split(' ')
     usr = received[0]
     pswd = received[1]
     if usr in credentials: # User already exists
+        cur.close() 
         main_connection.send(str.encode("0"))
         print("Signup unsuccessful")
         return -1
     else:
-        main_connection.send(str.encode("1"))
-        print("Signup successful")
+        # First, insert new created profile in DB
+        cur.execute("""
+        INSERT INTO users(username, password, created_on, last_login) 
+        VALUES ('{}','{}', now(), now());
+        """.format(usr, pswd))
+
+        # Commit change to DB 
+        db_connection.commit() 
+        print("Normalement dans la DB ")
+        cur.close()
         f = open("credentials.txt", "a")
         f.write(usr + " " + pswd + "\n")
+        
+        # Then, send back message
+        main_connection.send(str.encode("1"))
+        print("Signup successful")
         return usr
     
 def login(main_connection):

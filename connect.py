@@ -15,13 +15,16 @@ def connect():
         conn = psycopg2.connect(**params)
         print("Connected !")
         # create a cursor
-    #     cur = conn.cursor()
-        
+        cur = conn.cursor()
 	#     # execute a statement
-    #     cur.execute('SELECT count(*) FROM range_test ;')
+        test = cur.execute("""
+            SELECT *
+            FROM users ;
+        """)
+
 
 	# # # close the communication with the PostgreSQL
-    # #     cur.close()
+        cur.close()
     except (Exception, psycopg2.DatabaseError) as error:
         print(error)
     finally:
