@@ -3,8 +3,9 @@
 import socket, time
 from _thread import *
 import tkinter as tk
+from tkinter import scrolledtext
 
-font = "Comic Sans Ms"
+font = "Arial Black"
 
 disconnection = False # It is put to True when the user wants to be disconnected
 
@@ -20,35 +21,13 @@ def connect_to_server(ip, remote_port):
     return s
 
 
-def login(ip):
-    print("####### LOGIN #######")
-    usr = input("Username : ")
-    pswd = input("Password : ")
-    server_main_socket = connect_to_server(ip, 10000) # The server port number to connect is 10000
-
-    server_main_socket.send(str.encode("0")) # Code stating we want to login
-    server_main_socket.send(str.encode(str(usr) + " " + str(pswd))) # str.encode() to transform the string into bytes
-
-    ans = bytes.decode(server_main_socket.recv(1)) # 1 byte is enough
-    if ans == "0":
-        print("Username unkown\n")
-        return -1, -1, -1
-    elif ans == "1":
-        print("Password incorrect\n")
-        return -1, -1, -1
-    elif ans == "2":
-        print("Connection successful\n")
-        remote_port = bytes.decode(server_main_socket.recv(4)) # 4 bytes for a port number between 2000 and 3000 (in string format so each character takes a byte)
-        server_listen_socket = connect_to_server(ip, int(remote_port)) # Connect to the new port specific for this client, given by the server
-        return usr, server_main_socket, server_listen_socket
-    else:
-        raise Exception("Unexpected answer")
-
-
 def check_credentials(usr, pswd):
-    if (usr[0]).isdigit() or len(usr) > 10: # A username can't start with a digit or be longer than 10 characters
+    if len(usr) == 0:
+        return False;
+    elif (usr[0]).isdigit() or len(usr) > 10: # A username can't start with a digit or be longer than 10 characters
         return False
     return True
+
 
 def listen_for_input(): # Listen for the client's input and sends it to the server
     global disconnection
@@ -83,7 +62,6 @@ def listen_for_messages(): # Listen from messages from the server and displays t
         print("From user " + sender + " : " + data)
 
 #GUI
-
 
 def init_gui():
     global root
@@ -126,6 +104,7 @@ def login_gui():
     resp.place(x=10, y=250)
 
     def login(ip):
+        global usr
 
         usr = user_entry.get()
         pswd = pass_entry.get()
@@ -143,8 +122,8 @@ def login_gui():
             resp.configure(text=f'Login Successful\n Welcome {usr} ', fg='green')
             remote_port = bytes.decode(server_main_socket.recv(
                 4))  # 4 bytes for a port number between 2000 and 3000 (in string format so each character takes a byte)
-            server_listen_socket = connect_to_server(ip,
-                                                     int(remote_port))  # Connect to the new port specific for this client, given by the server
+            server_listen_socket = connect_to_server(ip,int(remote_port))  # Connect to the new port specific for this client, given by the server
+            chat_init_gui()
         else:
             raise Exception("Unexpected answer")
 
@@ -161,8 +140,38 @@ def login_gui():
     root.mainloop()
 
 
-def chat_gui():
- print("zeubi")
+def chat_init_gui():
+    global root
+    root.destroy()
+    root = tk.Toplevel()
+
+    root.title('Register')
+    root.geometry('600x400')
+    root.configure(bg='white')
+    root.resizable(False, False)
+
+    tk.Label(root, text='Chat', bg='white', font=(font, 13), width=50, height=1).pack()
+    text = scrolledtext.ScrolledText(root, height=17, width=41, font=(font, 10), wrap='word')
+    text.place(x=10, y=40)
+    text.yview('end')
+
+
+    msg_entry = tk.Entry(root, font=(font,13),width=25)
+    msg_entry.place(x=10,y=365)
+
+    send = tk.Button(root, font=(font,10), text='Send',bd=0,bg='blue',fg='black',width=10,command=lambda : print("envoyer message"))
+    send.place(x=300,y=365)
+
+    tk.Label(root, font=(font,13),bg='blue',fg='black',text='Users',width=12).place(y=40,x=400)
+
+    tk.Label(root, font=(font, 13), bg='Green', fg='black', text='Users', width=10).place(y=200, x=400)
+
+    active_users = tk.Listbox(root, height=8, width=20)
+    active_users.place(x=400, y=230)
+
+    tk.Label(root, text='Logged In as : \n' + usr, font=(font, 10)).place(x=400, y=360)
+
+    root.mainloop()
 
 
 def register_gui():
@@ -193,20 +202,41 @@ def register_gui():
     resp = tk.Label(root, text='', font=(font, 10, 'bold'), bg='white')
     resp.place(x=10, y=250)
 
-    submit = tk.Button(root, text='Submit', font=(font, 10, 'bold'), width=14, bg='green', command = login,
+    def signup(ip):
+        usr = user_entry.get()
+        pswd = pass_entry.get()
+
+        if not check_credentials(usr, pswd):
+            resp.configure(text="A username can't start with a digit or be longer than 10 characters",  wraplength=200, fg='red')
+        else:
+            server_main_socket = connect_to_server(ip, 10000)  # The server port number to connect is 10000
+
+            server_main_socket.send(str.encode("1"))  # Code stating we want to sign up
+            server_main_socket.send(
+                str.encode(str(usr) + " " + str(pswd)))  # str.encode() to transform the string into bytes
+
+            ans = bytes.decode(server_main_socket.recv(1))  # 1 byte is enough, it's the status of the query
+            if ans == "0":
+                resp.configure(text='Username already used',  wraplength=200, fg='red')
+
+            elif ans == "1":
+                resp.configure(text='Siggnup succesfull !',  wraplength=200, fg='green')
+                time.sleep(3)
+                chat_init_gui()
+            else:
+                raise Exception("Unexpected answer")
+
+
+    submit = tk.Button(root, text='Submit', font=(font, 10, 'bold'), width=14, bg='green', command = lambda:signup(ip),
                        fg='black')
     submit.place(x=10, y=180)
 
     tk.Label(root, text='Already Have an account ?', bg='white', font=(font, 10, "normal")).place(x=30, y=210)
 
     tk.Button(root, text='login', font=(font, 10, 'underline'), bg='white', fg='blue',
-              command=login).place(x=200, y=210)
+              command=login_gui).place(x=200, y=210)
 
     root.bind('<Return>', init_gui)
-
-
-    resp = tk.Label(root, text='', font=('Arial Black', 10, 'bold'), bg='white')
-    resp.place(x=10, y=250)
 
     root.mainloop()
 
@@ -215,20 +245,11 @@ def register_gui():
 
 #try:
 ip = "-1" # 192.168.1.30" # IP address of the remote server, or -1 for local
-while True:
-    init_gui()
-    print("sheesh")
-    log = "0"
-    if log == "0":
-        signup(ip)
-    elif log == "1":
-        usr, server_main_socket, server_listen_socket = login(ip)
-        if usr != -1:
-            start_new_thread(listen_for_input, ()) # Thread that listens to the client's inputs and sends them to their recipient
-            start_new_thread(listen_for_messages, ()) # Thread that listens to the inputs from the server or other clients and displays them
-            while not disconnection: # While the user doesn't want to be disconnected, we wait
-                pass
-            print("You are now disconnected")
-            disconnection = False
-#finally:
-    #server_main_socket.close()
+init_gui()
+
+
+#
+# start_new_thread(listen_for_input, ()) # Thread that listens to the client's inputs and sends them to their recipient
+# start_new_thread(listen_for_messages, ()) # Thread that listens to the inputs from the server or other clients and displays them
+# while not disconnection: # While the user doesn't want to be disconnected, we wait
+
