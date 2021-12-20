@@ -76,7 +76,31 @@ def init_gui():
     tk.Button(root, text="Register", command=register_gui).grid(row=4, column=2)
 
     root.mainloop()
-
+    
+def authenticate_nonce(server_main_socket, private_key):
+    nonce = server_main_socket.recv(64) # No need to convert in str
+    print("Nonce : ", end='')
+    print(nonce)
+    print("Private key : ", end='')
+    print(private_key)
+    
+    encrypted_private_key_nonce = private_key.sign( # See doc on https://cryptography.io/en/latest/hazmat/primitives/asymmetric/rsa/
+        nonce,
+        padding.PSS(
+            mgf=padding.MGF1(hashes.SHA256()),
+            salt_length=padding.PSS.MAX_LENGTH
+        ),
+        hashes.SHA256()
+    )
+    
+    print("Encrypted nonce : ", end='')
+    print(encrypted_private_key_nonce)
+    
+    server_main_socket.send(encrypted_private_key_nonce) # No need to encode because already in bytes
+    
+    a = bytes.decode(server_main_socket.recv(1))
+    print(a)
+    return a == "1"
 
 def login_gui():
     global root
@@ -122,11 +146,14 @@ def login_gui():
         elif ans == "1":
             resp.configure(text="incorrect password", fg='red')
         elif ans == "2":
-            resp.configure(text=f'Login Successful\n Welcome {usr} ', fg='green')
-            remote_port = bytes.decode(server_main_socket.recv(
-                4))  # 4 bytes for a port number between 2000 and 3000 (in string format so each character takes a byte)
-            server_listen_socket = connect_to_server(ip,int(remote_port))  # Connect to the new port specific for this client, given by the server
-            chat_init_gui()
+            if not authenticate_nonce(server_main_socket, get_keys()[0]):
+                resp.configure(text="incorrect private key", fg='red')
+            else:
+                resp.configure(text=f'Login Successful\n Welcome {usr} ', fg='green')
+                remote_port = bytes.decode(server_main_socket.recv(
+                    4))  # 4 bytes for a port number between 2000 and 3000 (in string format so each character takes a byte)
+                server_listen_socket = connect_to_server(ip,int(remote_port))  # Connect to the new port specific for this client, given by the server
+                chat_init_gui()
         else:
             raise Exception("Unexpected answer")
 
@@ -205,7 +232,8 @@ def generate_keys(): # Source of this function : https://nitratine.net/blog/post
         
 def get_keys(): # Source of this function : https://nitratine.net/blog/post/asymmetric-encryption-and-decryption-in-python/
     if not os.path.exists("private_key.pem") or not os.path.exists("public_key.pem"):
-        return -1, -1 # Private and public keys are not created yet
+        print("Asymetric keys doesn't exist yet, creating them...")
+        generate_keys() # Generates the public and private keys and store them into files
     
     with open("private_key.pem", "rb") as key_file:
         private_key = serialization.load_pem_private_key(
@@ -223,8 +251,10 @@ def get_keys(): # Source of this function : https://nitratine.net/blog/post/asym
     return private_key, public_key
     
 def read_keys(): # Source of this function : https://nitratine.net/blog/post/asymmetric-encryption-and-decryption-in-python/
+    print("Read keys : " + str(os.path.exists("private_key.pem")))
     if not os.path.exists("private_key.pem") or not os.path.exists("public_key.pem"):
-        return -1, -1 # Private and public keys are not created yet
+        print("Asymetric keys doesn't exist yet, creating them...")
+        generate_keys() # Generates the public and private keys and store them into files
     
     key_file = open("private_key.pem", "r")
     private_key = key_file.read()
@@ -286,11 +316,7 @@ def register_gui():
         if not check_credentials(usr, pswd):
             resp.configure(text="A username can't start with a digit or be longer than 10 characters",  wraplength=200, fg='red')
         else:
-            private_key, public_key = read_keys() # Gets the public and private keys if already created
-            if private_key == -1: # If they doesn't exist yet
-                print("Asymetric keys doesn't exist yet, creating them...")
-                generate_keys() # Generates the public and private keys and store them into files
-                private_key, public_key = read_keys()
+            private_key, public_key = read_keys() # Gets the public and private keys, and creates them if needed
                 
             clean_public_key = (public_key.split('-')[10]).strip() # Removes the "-----BEGIN PUBLIC KEY----" and "----END PUBLIC KEY----"
                 
