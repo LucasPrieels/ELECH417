@@ -4,7 +4,6 @@ import socket, time
 from _thread import *
 import tkinter as tk
 from tkinter import scrolledtext
-
 font = "Arial Black"
 
 disconnection = False # It is put to True when the user wants to be disconnected
@@ -30,6 +29,7 @@ def check_credentials(usr, pswd):
 
 
 def listen_for_input(): # Listen for the client's input and sends it to the server
+    #splitter en deux parties
     global disconnection
     while True:
         usr = input("To which user would you like to send messages ? Send '.' to disconnect\n")
@@ -105,6 +105,7 @@ def login_gui():
 
     def login(ip):
         global usr
+        global server_listen_socket
 
         usr = user_entry.get()
         pswd = pass_entry.get()
@@ -155,6 +156,10 @@ def chat_init_gui():
     text.place(x=10, y=40)
     text.yview('end')
 
+    text.insert('insert', "J'adore les gros chibre")
+    text.insert('end',"J'adore les gros chibre")
+
+
 
     msg_entry = tk.Entry(root, font=(font,13),width=25)
     msg_entry.place(x=10,y=365)
@@ -162,7 +167,7 @@ def chat_init_gui():
     send = tk.Button(root, font=(font,10), text='Send',bd=0,bg='blue',fg='black',width=10,command=lambda : print("envoyer message"))
     send.place(x=300,y=365)
 
-    tk.Label(root, font=(font,13),bg='blue',fg='black',text='Users',width=12).place(y=40,x=400)
+    tk.Label(root, font=(font,13),bg='blue',fg='black',text='User',width=12).place(y=40,x=400)
 
     tk.Label(root, font=(font, 13), bg='Green', fg='black', text='Users', width=10).place(y=200, x=400)
 
@@ -203,6 +208,7 @@ def register_gui():
     resp.place(x=10, y=250)
 
     def signup(ip):
+        global server_main_socket
         usr = user_entry.get()
         pswd = pass_entry.get()
 
@@ -220,9 +226,7 @@ def register_gui():
                 resp.configure(text='Username already used',  wraplength=200, fg='red')
 
             elif ans == "1":
-                resp.configure(text='Siggnup succesfull !',  wraplength=200, fg='green')
-                time.sleep(3)
-                chat_init_gui()
+                resp.configure(text='Signup succesfull !',  wraplength=200, fg='green')
             else:
                 raise Exception("Unexpected answer")
 
@@ -249,7 +253,7 @@ init_gui()
 
 
 #
-# start_new_thread(listen_for_input, ()) # Thread that listens to the client's inputs and sends them to their recipient
-# start_new_thread(listen_for_messages, ()) # Thread that listens to the inputs from the server or other clients and displays them
+#start_new_thread(listen_for_input, ()) # Thread that listens to the client's inputs and sends them to their recipient
+#start_new_thread(listen_for_messages, ()) # Thread that listens to the inputs from the server or other clients and displays them
 # while not disconnection: # While the user doesn't want to be disconnected, we wait
 
