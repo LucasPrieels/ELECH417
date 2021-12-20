@@ -120,7 +120,7 @@ def chat_init_gui():
     global root
     global usr
     global user_to
-    user_to = usr # juste pour tester
+    user_to = usr  # juste pour tester
     root.destroy()
     root = tk.Tk()
     root.title('Chat')
@@ -128,7 +128,7 @@ def chat_init_gui():
     root.configure(bg='white')
     root.resizable(False, False)
 
-    tk.Label(root, text='Chat', bg='white', font=(font, 13),fg = 'black', width=50, height=1).place(x=-200, y=20)
+    tk.Label(root, text='Chat', bg='white', font=(font, 13), fg='black', width=50, height=1).place(x=-200, y=20)
     text = scrolledtext.ScrolledText(root, height=17, width=41, font=(font, 10), wrap='word')
     text.place(x=10, y=40)
     text.yview(tk.END)
@@ -138,8 +138,6 @@ def chat_init_gui():
     text.insert(tk.INSERT, "J'adore les gros chibre")
     text.configure(state=tk.DISABLED)
 
-
-
     msg_entry = tk.Entry(root, font=(font, 13), width=25)
 
     msg_entry.place(x=10, y=365)
@@ -148,9 +146,9 @@ def chat_init_gui():
         user_from = bytes.decode(server_main_socket.recv(10))
         data = bytes.decode(server_main_socket.recv(2048))
         text.configure(state=tk.NORMAL)
-        text.insert(tk.INSERT, '['+user_from+']','name')
-        text.insert(tk.INSERT, data+"\n",'message')
-        text.tag_config('name', foreground="green",font = (font, 14, 'bold'))
+        text.insert(tk.INSERT, '[' + user_from + ']', 'name')
+        text.insert(tk.INSERT, data + "\n", 'message')
+        text.tag_config('name', foreground="green", font=(font, 14, 'bold'))
         text.tag_config('message', foreground="green")
         text.configure(state=tk.DISABLED)
 
@@ -160,14 +158,12 @@ def chat_init_gui():
         print("message envoyé")
         msg_entry.delete(0, 'end')
 
-
-
-
     sendbutton = tk.Button(root, font=(font, 10), text='Send', bd=0, bg='blue', fg='black', width=10,
-                     command=send)
+                           command=send)
     sendbutton.place(x=300, y=365)
 
-    tk.Label(root, font=(font, 13), bg='blue', fg='black', text="send to " + user_to, width=12).place(y=40, x=400)
+    sendto_label = tk.Label(root, font=(font, 13), bg='blue', fg='black', text="Send to " + user_to, width=15)
+    sendto_label.place(y=40, x=400)
 
     tk.Label(root, font=(font, 13), bg='Green', fg='black', text='Users', width=10).place(y=200, x=400)
 
@@ -176,7 +172,26 @@ def chat_init_gui():
 
     tk.Label(root, text='Logged In as : \n' + usr, font=(font, 10)).place(x=400, y=360)
 
+    active_users = tk.Listbox(root, height=8, width=20)
+    active_users.place(x=400, y=230)
 
+    users = ["Karim", "Mahmoud", "Jean", "Jacques"]
+    i = 0
+    while i < len(users):
+        active_users.insert(i + 1, users[i])
+        i += 1
+
+    def callback(event):
+        selection = event.widget.curselection()
+        if selection:
+            index = selection[0]
+            data = event.widget.get(index)
+            sendto_label.configure(text="Send to " + data)
+        else:
+            sendto_label.configure(text="")
+
+    active_users.bind("<Double-1>", callback)   #Get the user we click on
+    user_to = sendto_label.cget("text")         #Update the user we want to talk to
 
     root.mainloop()
 
