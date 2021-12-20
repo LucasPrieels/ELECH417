@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import socket, time, os.path
+import socket, time, os, hashlib
 from _thread import *
 import tkinter as tk
 from tkinter import scrolledtext
@@ -24,9 +24,7 @@ def connect_to_server(ip, remote_port):
 
 
 def check_credentials(usr, pswd):
-    if len(usr) == 0:
-        return False;
-    elif (usr[0]).isdigit() or len(usr) > 10: # A username can't start with a digit or be longer than 10 characters
+    if (usr[0]).isdigit() or len(usr) > 10 or len(usr) == 0 or len(pswd) < 3: # A username can't start with a digit or be longer than 10 characters and a pasword can't be shorter than 3 characters
         return False
     return True
 
@@ -115,7 +113,14 @@ def login_gui():
 
         server_main_socket = connect_to_server(ip, 10000)  # The server port number to connect is 10000
         server_main_socket.send(str.encode("0"))  # Code stating we want to login
-        server_main_socket.send(str.encode(str(usr) + " " + str(pswd)))  # str.encode() to transform the string into bytes
+        
+        server_main_socket.send(str.encode(usr))
+        salt = bytes.fromhex(bytes.decode(server_main_socket.recv(32)))
+        pw_hash = hashlib.pbkdf2_hmac("sha256", str.encode(pswd), salt, 100000) # 100 000 is the number of iterations of sha-256
+        server_main_socket.send(str.encode(pw_hash.hex()))  # str.encode() to transform the string into bytes
+                
+        print("Public key sent")
+        print(pw_hash.hex() + " " + salt.hex())
 
         ans = bytes.decode(server_main_socket.recv(1))  # 1 byte is enough
         if ans == "0":
@@ -150,8 +155,8 @@ def login_gui():
 def chat_init_gui():
     global root
     global usr
-    global user_to
-    user_to = usr # juste pour tester
+    #global user_to
+    #user_to = usr # juste pour tester
     root.destroy()
     root = tk.Tk()
     root.title('Chat')
@@ -322,9 +327,10 @@ def register_gui():
         global server_main_socket
         usr = user_entry.get()
         pswd = pass_entry.get()
+        print("Pswd : " + pswd)
 
         if not check_credentials(usr, pswd):
-            resp.configure(text="A username can't start with a digit or be longer than 10 characters",  wraplength=200, fg='red')
+            resp.configure(text="A username can't start with a digit or be longer than 10 characters and a pasword can't be shorter than 3 characters",  wraplength=200, fg='red')
         else:
             private_key, public_key = read_keys() # Gets the public and private keys, and creates them if needed
                 
@@ -337,9 +343,14 @@ def register_gui():
             server_main_socket = connect_to_server(ip, 10000)  # The server port number to connect is 10000
 
             server_main_socket.send(str.encode("1"))  # Code stating we want to sign up
+            
+            salt = os.urandom(16)
+            pw_hash = hashlib.pbkdf2_hmac("sha256", str.encode(pswd), salt, 100000) # 100 000 is the number of iterations of sha-256
             server_main_socket.send(
-                str.encode(usr + " " + pswd + " " + clean_public_key))  # str.encode() to transform the string into bytes
+                str.encode(usr + " " + pw_hash.hex() + " " + salt.hex() + " " + clean_public_key))  # str.encode() to transform the string into bytes
+                
             print("Public key sent")
+            print(pw_hash.hex() + " " + salt.hex())
 
             ans = bytes.decode(server_main_socket.recv(1))  # 1 byte is enough, it's the status of the query
             if ans == "0":

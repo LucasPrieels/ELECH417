@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import socket, random, secrets
+import socket, random, secrets, hmac
 from _thread import *
 from connect import connect, disconnect
 from cryptography.fernet import Fernet
@@ -73,7 +73,8 @@ def signup(main_connection):
     # New version, using DB
     credentials = get_users_from_db()
 
-    usr, pswd, public_key_string = bytes.decode(client_connection.recv(1024)).split(' ')
+    usr, pswd, salt, public_key_string = bytes.decode(client_connection.recv(2048)).split(' ')
+    print(pswd)
     print("Public key of user : " + public_key_string)
     
     # Generates the symmetric key for the connection with this user
@@ -88,9 +89,9 @@ def signup(main_connection):
     else:
         # First, insert new created profile in DB
         cur.execute("""
-        INSERT INTO users(username, password, created_on, last_login, client_public_key, symmetric_key)
-        VALUES ('{}','{}', now(), now(), '{}', '{}');
-        """.format(usr, pswd, public_key_string, bytes.decode(symm_key)))
+        INSERT INTO users(username, password, salt, created_on, last_login, client_public_key, symmetric_key)
+        VALUES ('{}','{}', '{}', now(), now(), '{}', '{}');
+        """.format(usr, pswd, salt, public_key_string, bytes.decode(symm_key)))
 
         # Commit change to DB 
         db_connection.commit() 
@@ -118,7 +119,7 @@ def signup(main_connection):
         return usr
 
 
-def authentication(username, password) :
+def authentication(username, pw_hash) :
     """
     Gets the password from the DB and verifies it matches the entry
     """
@@ -129,10 +130,11 @@ def authentication(username, password) :
     SELECT password FROM users WHERE username = '{}'
     """.format(username)
     cur.execute(query)
-
-    res = cur.fetchone()[0]
-    print(password, res)
-    return password == res
+    res = cur.fetchone()
+    pw_hash_db = res[0]
+    
+    print(username, pw_hash, pw_hash_db)
+    return pw_hash == pw_hash_db
 
 def update_last_login(username) :
     # Updates the "last_login" timestamp attribute of the username in the DB
@@ -160,20 +162,33 @@ def get_client_public_key(username):
     res = cur.fetchone()[0]
     print("The public key of user " + username + " is " + res)
     return transform_string_to_key(res)
+    
+def get_salt_from_db(username):
+    global db_connection
+    cur = db_connection.cursor()
+    query = """
+    SELECT salt FROM users WHERE username = '{}'
+    """.format(username)
+    cur.execute(query)
+
+    res = cur.fetchone()[0]
+    print("The salt of user " + username + " is " + res)
+    return res
 
 def login(main_connection):
     credentials = get_users_from_db()
     
-    received = bytes.decode(client_connection.recv(1024)).split(' ')
-    usr = received[0]
-    pswd = received[1]
+    usr = bytes.decode(client_connection.recv(1024))
+    client_connection.send(str.encode(get_salt_from_db(usr)))
+    
+    pswd_hashed = bytes.decode(client_connection.recv(1024))
     
     if usr not in credentials:
         client_connection.send(str.encode("0"))
         print("Login unsucessful")
         return -1, -1
 
-    pw_check = authentication(usr, pswd)    
+    pw_check = authentication(usr, pswd_hashed)
     if not pw_check:
         main_connection.send(str.encode("1"))
         print("Login unsucessful")
