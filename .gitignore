@@ -1,2 +1,5 @@
 database.ini
+private_key.pem
+public_key.pem
+symm_key.key
 __pycache__
