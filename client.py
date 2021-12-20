@@ -144,11 +144,24 @@ def chat_init_gui():
 
     msg_entry.place(x=10, y=365)
 
+    def receive():  # Listen from messages from the server and displays them
+        user_from = bytes.decode(server_main_socket.recv(10))
+        data = bytes.decode(server_main_socket.recv(2048))
+        text.configure(state=tk.NORMAL)
+        text.insert(tk.INSERT, '['+user_from+']','name')
+        text.insert(tk.INSERT, data+"\n",'message')
+        text.tag_config('name', foreground="green",font = (font, 14, 'bold'))
+        text.tag_config('message', foreground="green")
+        text.configure(state=tk.DISABLED)
+
     def send():  # Listen for the client's input and sends it to the server
         data = msg_entry.get()
         server_listen_socket.send(str.encode(data))  # Send message
         print("message envoyé")
         msg_entry.delete(0, 'end')
+
+
+
 
     sendbutton = tk.Button(root, font=(font, 10), text='Send', bd=0, bg='blue', fg='black', width=10,
                      command=send)
