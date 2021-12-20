@@ -5,8 +5,8 @@ from _thread import *
 import tkinter as tk
 from tkinter import scrolledtext
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa, padding
+from cryptography.hazmat.primitives import serialization, hashes
 
 font = "Arial Black"
 disconnection = False # It is put to True when the user wants to be disconnected
@@ -227,6 +227,7 @@ def get_keys(): # Source of this function : https://nitratine.net/blog/post/asym
             key_file.read(),
             backend=default_backend()
         )
+        
     return private_key, public_key
     
 def read_keys(): # Source of this function : https://nitratine.net/blog/post/asymmetric-encryption-and-decryption-in-python/
@@ -240,6 +241,23 @@ def read_keys(): # Source of this function : https://nitratine.net/blog/post/asy
     public_key = key_file.read()
         
     return private_key, public_key
+    
+def get_symmetric_key_from_server(server_main_socket):
+    encrypted_symm_key = server_main_socket.recv(1024) # The key can stay in bytes, no need to convert in str
+                
+    private_key, public_key = get_keys()
+    symm_key = private_key.decrypt(
+        encrypted_symm_key,
+        padding.OAEP(
+            mgf=padding.MGF1(algorithm=hashes.SHA256()),
+            algorithm=hashes.SHA256(),
+            label=None
+        )
+    )
+    print("Symmetric key : " + bytes.decode(symm_key))
+    
+    with open("symm_key.key", "wb") as symm_key_file:
+        symm_key_file.write(symm_key)
 
 
 def register_gui():
@@ -280,7 +298,7 @@ def register_gui():
         else:
             private_key, public_key = read_keys() # Gets the public and private keys if already created
             if private_key == -1: # If they doesn't exist yet
-                print("Asymetric keys doesn't exist yet, creating them")
+                print("Asymetric keys doesn't exist yet, creating them...")
                 generate_keys() # Generates the public and private keys and store them into files
                 private_key, public_key = read_keys()
                 
@@ -302,7 +320,12 @@ def register_gui():
                 resp.configure(text='Username already used',  wraplength=200, fg='red')
 
             elif ans == "1":
-                resp.configure(text='Signup succesfull !',  wraplength=200, fg='green')
+                print(1)
+                get_symmetric_key_from_server(server_main_socket) # Waits for the server to send the encrypted symmetric key, decrypts it and stores it into a file symm_key.key
+
+                resp.configure(text='Signup successful !',  wraplength=200, fg='green')
+                time.sleep(3)
+                chat_init_gui()
             else:
                 raise Exception("Unexpected answer")
 

@@ -3,6 +3,11 @@
 import socket, random, secrets
 from _thread import *
 from connect import connect, disconnect
+from cryptography.fernet import Fernet
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives.asymmetric import rsa, padding
+from cryptography.hazmat.primitives import serialization, hashes
+
 clients = {} # List of clients connected with their username and their socket
 current_port = 0
 
@@ -59,8 +64,12 @@ def signup(main_connection):
     # New version, using DB
     credentials = get_users_from_db()
 
-    usr, pswd, public_key = bytes.decode(client_connection.recv(1024)).split(' ')
-    print("Public key : " + public_key)
+    usr, pswd, public_key_string = bytes.decode(client_connection.recv(1024)).split(' ')
+    print("Public key of user : " + public_key_string)
+    
+    # Generates the symmetric key for the connection with this user
+    symm_key = Fernet.generate_key()
+    print("Symmetric key for this connection : " + bytes.decode(symm_key))
 
     if usr in credentials: # User already exists
         cur.close() 
@@ -70,19 +79,39 @@ def signup(main_connection):
     else:
         # First, insert new created profile in DB
         cur.execute("""
-        INSERT INTO users(username, password, created_on, last_login) 
-        VALUES ('{}','{}', now(), now());
-        """.format(usr, pswd))
+        INSERT INTO users(username, password, created_on, last_login, client_public_key, symmetric_key)
+        VALUES ('{}','{}', now(), now(), '{}', '{}');
+        """.format(usr, pswd, public_key_string, bytes.decode(symm_key)))
 
         # Commit change to DB 
         db_connection.commit() 
-        print("Normalement dans la DB ")
+        print("User ajouté dans la DB ")
         cur.close()
-        f = open("credentials.txt", "a")
-        f.write(usr + " " + pswd + "\n")
+        #f = open("credentials.txt", "a")
+        #f.write(usr + " " + pswd + "\n")
         
         # Then, send back message
         main_connection.send(str.encode("1"))
+        
+        # Transforms the string version of the public key into a real cryptography public key
+        public_key_bytes = str.encode("-----BEGIN PUBLIC KEY-----\n" + public_key_string + "\n-----END PUBLIC KEY-----\n")
+        print(public_key_bytes)
+        public_key = serialization.load_pem_public_key(
+            public_key_bytes,
+            backend=default_backend()
+        )
+        
+        encrypted_symm_key = public_key.encrypt(
+            symm_key, # The message to be encrypted is the symmetric key
+            padding.OAEP(
+                mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                algorithm=hashes.SHA256(),
+                label=None
+            )
+        )
+        
+        main_connection.send(encrypted_symm_key) # The encrypted key is already in bytes, no need to convert
+
         print("Signup successful")
         return usr
 
