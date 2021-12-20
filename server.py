@@ -171,15 +171,18 @@ def get_salt_from_db(username):
     """.format(username)
     cur.execute(query)
 
-    res = cur.fetchone()[0]
-    print("The salt of user " + username + " is " + res)
-    return res
+    try:
+        res = cur.fetchone()[0]
+        print("The salt of user " + username + " is " + res)
+        return res
+    except:
+        return (str.encode("a")).hex()
 
 def login(main_connection):
     credentials = get_users_from_db()
     
     usr = bytes.decode(client_connection.recv(1024))
-    client_connection.send(str.encode(get_salt_from_db(usr)))
+    client_connection.send(str.encode(str(get_salt_from_db(usr))))
     
     pswd_hashed = bytes.decode(client_connection.recv(1024))
     
