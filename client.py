@@ -27,30 +27,6 @@ def check_credentials(usr, pswd):
     return True
 
 
-def listen_for_input(): # Listen for the client's input and sends it to the server
-    #splitter en deux parties
-    global disconnection
-    while True:
-        usr = input("To which user would you like to send messages ? Send '.' to disconnect\n")
-        server_listen_socket.send(str.encode(usr)) # Send to the server socket that is listening to us
-        reply = bytes.decode(server_listen_socket.recv(1)) # Receive from the main server socket
-        
-        if usr == ".": # User wants to disconnect
-            disconnection = True
-            break
-        
-        if reply == "0":
-            print("The specified user doesn't exist or is not connected")
-            continue
-        
-        print("You can now send messages to " + usr + ", hit return to send them and send '.' to stop")
-        while True:
-            data = input()
-            server_listen_socket.send(str.encode(data)) # Send message
-            if data == ".": # Stop communication with this user
-                break
-
-
 def listen_for_messages(): # Listen from messages from the server and displays them
     sender = bytes.decode(server_main_socket.recv(10))
     while True:
@@ -168,9 +144,15 @@ def chat_init_gui():
 
     msg_entry.place(x=10, y=365)
 
-    send = tk.Button(root, font=(font, 10), text='Send', bd=0, bg='blue', fg='black', width=10,
-                     command=lambda: print("envoyer message"))
-    send.place(x=300, y=365)
+    def send():  # Listen for the client's input and sends it to the server
+        data = msg_entry.get()
+        server_listen_socket.send(str.encode(data))  # Send message
+        print("message envoyé")
+        msg_entry.delete(0, 'end')
+
+    sendbutton = tk.Button(root, font=(font, 10), text='Send', bd=0, bg='blue', fg='black', width=10,
+                     command=send)
+    sendbutton.place(x=300, y=365)
 
     tk.Label(root, font=(font, 13), bg='blue', fg='black', text="send to " + user_to, width=12).place(y=40, x=400)
 
@@ -180,6 +162,8 @@ def chat_init_gui():
     active_users.place(x=400, y=230)
 
     tk.Label(root, text='Logged In as : \n' + usr, font=(font, 10)).place(x=400, y=360)
+
+
 
     root.mainloop()
 
