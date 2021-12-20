@@ -294,7 +294,6 @@ def get_symmetric_key_from_server(server_main_socket):
     with open("symm_key.key", "wb") as symm_key_file:
         symm_key_file.write(symm_key)
 
-
 def register_gui():
     global root
     root.destroy()
@@ -347,6 +346,7 @@ def register_gui():
             salt = os.urandom(16)
             pw_hash = hashlib.pbkdf2_hmac("sha256", str.encode(pswd), salt, 100000) # 100 000 is the number of iterations of sha-256
             server_main_socket.send(
+
                 str.encode(usr + " " + pw_hash.hex() + " " + salt.hex() + " " + clean_public_key))  # str.encode() to transform the string into bytes
                 
             print("Public key sent")
