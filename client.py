@@ -1,9 +1,13 @@
 #!/usr/bin/python3
 
-import socket, time
+import socket, time, os, hashlib
 from _thread import *
 import tkinter as tk
 from tkinter import scrolledtext
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives.asymmetric import rsa, padding
+from cryptography.hazmat.primitives import serialization, hashes
+
 font = "Arial Black"
 disconnection = False # It is put to True when the user wants to be disconnected
 
@@ -20,9 +24,7 @@ def connect_to_server(ip, remote_port):
 
 
 def check_credentials(usr, pswd):
-    if len(usr) == 0:
-        return False;
-    elif (usr[0]).isdigit() or len(usr) > 10: # A username can't start with a digit or be longer than 10 characters
+    if (usr[0]).isdigit() or len(usr) > 10 or len(usr) == 0 or len(pswd) < 3: # A username can't start with a digit or be longer than 10 characters and a pasword can't be shorter than 3 characters
         return False
     return True
 
@@ -48,7 +50,31 @@ def init_gui():
     tk.Button(root, text="Register", command=register_gui).grid(row=4, column=2)
 
     root.mainloop()
-
+    
+def authenticate_nonce(server_main_socket, private_key):
+    nonce = server_main_socket.recv(64) # No need to convert in str
+    print("Nonce : ", end='')
+    print(nonce)
+    print("Private key : ", end='')
+    print(private_key)
+    
+    encrypted_private_key_nonce = private_key.sign( # See doc on https://cryptography.io/en/latest/hazmat/primitives/asymmetric/rsa/
+        nonce,
+        padding.PSS(
+            mgf=padding.MGF1(hashes.SHA256()),
+            salt_length=padding.PSS.MAX_LENGTH
+        ),
+        hashes.SHA256()
+    )
+    
+    print("Encrypted nonce : ", end='')
+    print(encrypted_private_key_nonce)
+    
+    server_main_socket.send(encrypted_private_key_nonce) # No need to encode because already in bytes
+    
+    a = bytes.decode(server_main_socket.recv(1))
+    print(a)
+    return a == "1"
 
 def login_gui():
     global root
@@ -87,7 +113,14 @@ def login_gui():
 
         server_main_socket = connect_to_server(ip, 10000)  # The server port number to connect is 10000
         server_main_socket.send(str.encode("0"))  # Code stating we want to login
-        server_main_socket.send(str.encode(str(usr) + " " + str(pswd)))  # str.encode() to transform the string into bytes
+        
+        server_main_socket.send(str.encode(usr))
+        salt = bytes.fromhex(bytes.decode(server_main_socket.recv(32)))
+        pw_hash = hashlib.pbkdf2_hmac("sha256", str.encode(pswd), salt, 100000) # 100 000 is the number of iterations of sha-256
+        server_main_socket.send(str.encode(pw_hash.hex()))  # str.encode() to transform the string into bytes
+                
+        print("Public key sent")
+        print(pw_hash.hex() + " " + salt.hex())
 
         ans = bytes.decode(server_main_socket.recv(1))  # 1 byte is enough
         if ans == "0":
@@ -95,11 +128,14 @@ def login_gui():
         elif ans == "1":
             resp.configure(text="incorrect password", fg='red')
         elif ans == "2":
-            resp.configure(text=f'Login Successful\n Welcome {usr} ', fg='green')
-            remote_port = bytes.decode(server_main_socket.recv(
-                4))  # 4 bytes for a port number between 2000 and 3000 (in string format so each character takes a byte)
-            server_listen_socket = connect_to_server(ip,int(remote_port))  # Connect to the new port specific for this client, given by the server
-            chat_init_gui()
+            if not authenticate_nonce(server_main_socket, get_keys()[0]):
+                resp.configure(text="incorrect private key", fg='red')
+            else:
+                resp.configure(text=f'Login Successful\n Welcome {usr} ', fg='green')
+                remote_port = bytes.decode(server_main_socket.recv(
+                    4))  # 4 bytes for a port number between 2000 and 3000 (in string format so each character takes a byte)
+                server_listen_socket = connect_to_server(ip,int(remote_port))  # Connect to the new port specific for this client, given by the server
+                chat_init_gui()
         else:
             raise Exception("Unexpected answer")
 
@@ -119,8 +155,8 @@ def login_gui():
 def chat_init_gui():
     global root
     global usr
-    global user_to
-    user_to = usr  # juste pour tester
+    #global user_to
+    #user_to = usr # juste pour tester
     root.destroy()
     root = tk.Tk()
     root.title('Chat')
@@ -194,8 +230,84 @@ def chat_init_gui():
     user_to = sendto_label.cget("text")         #Update the user we want to talk to
 
     root.mainloop()
+    
+def generate_keys(): # Source of this function : https://nitratine.net/blog/post/asymmetric-encryption-and-decryption-in-python/
 
-
+    # Generates the private and public keys
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+        backend=default_backend()
+    )
+    public_key = private_key.public_key()
+    
+    # Write the private key in private_key.pem
+    pem = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption()
+    )
+    with open('private_key.pem', 'wb') as f:
+        f.write(pem)
+        
+    # Write the public key in public_key.pem
+    pem = public_key.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+    with open('public_key.pem', 'wb') as f:
+        f.write(pem)
+        
+def get_keys(): # Source of this function : https://nitratine.net/blog/post/asymmetric-encryption-and-decryption-in-python/
+    if not os.path.exists("private_key.pem") or not os.path.exists("public_key.pem"):
+        print("Asymetric keys doesn't exist yet, creating them...")
+        generate_keys() # Generates the public and private keys and store them into files
+    
+    with open("private_key.pem", "rb") as key_file:
+        private_key = serialization.load_pem_private_key(
+            key_file.read(),
+            password=None,
+            backend=default_backend()
+        )
+    
+    with open("public_key.pem", "rb") as key_file:
+        public_key = serialization.load_pem_public_key(
+            key_file.read(),
+            backend=default_backend()
+        )
+        
+    return private_key, public_key
+    
+def read_keys(): # Source of this function : https://nitratine.net/blog/post/asymmetric-encryption-and-decryption-in-python/
+    print("Read keys : " + str(os.path.exists("private_key.pem")))
+    if not os.path.exists("private_key.pem") or not os.path.exists("public_key.pem"):
+        print("Asymetric keys doesn't exist yet, creating them...")
+        generate_keys() # Generates the public and private keys and store them into files
+    
+    key_file = open("private_key.pem", "r")
+    private_key = key_file.read()
+    
+    key_file = open("public_key.pem", "r")
+    public_key = key_file.read()
+        
+    return private_key, public_key
+    
+def get_symmetric_key_from_server(server_main_socket):
+    encrypted_symm_key = server_main_socket.recv(1024) # The key can stay in bytes, no need to convert in str
+                
+    private_key, public_key = get_keys()
+    symm_key = private_key.decrypt(
+        encrypted_symm_key,
+        padding.OAEP(
+            mgf=padding.MGF1(algorithm=hashes.SHA256()),
+            algorithm=hashes.SHA256(),
+            label=None
+        )
+    )
+    print("Symmetric key : " + bytes.decode(symm_key))
+    
+    with open("symm_key.key", "wb") as symm_key_file:
+        symm_key_file.write(symm_key)
 
 def register_gui():
     global root
@@ -229,22 +341,43 @@ def register_gui():
         global server_main_socket
         usr = user_entry.get()
         pswd = pass_entry.get()
+        print("Pswd : " + pswd)
 
         if not check_credentials(usr, pswd):
-            resp.configure(text="A username can't start with a digit or be longer than 10 characters",  wraplength=200, fg='red')
+            resp.configure(text="A username can't start with a digit or be longer than 10 characters and a pasword can't be shorter than 3 characters",  wraplength=200, fg='red')
         else:
+            private_key, public_key = read_keys() # Gets the public and private keys, and creates them if needed
+                
+            clean_public_key = (public_key.split('-')[10]).strip() # Removes the "-----BEGIN PUBLIC KEY----" and "----END PUBLIC KEY----"
+                
+            print("Public key : " + public_key)
+            print(clean_public_key)
+            print("Private key : " + private_key)
+            
             server_main_socket = connect_to_server(ip, 10000)  # The server port number to connect is 10000
 
             server_main_socket.send(str.encode("1"))  # Code stating we want to sign up
+            
+            salt = os.urandom(16)
+            pw_hash = hashlib.pbkdf2_hmac("sha256", str.encode(pswd), salt, 100000) # 100 000 is the number of iterations of sha-256
             server_main_socket.send(
-                str.encode(str(usr) + " " + str(pswd)))  # str.encode() to transform the string into bytes
+
+                str.encode(usr + " " + pw_hash.hex() + " " + salt.hex() + " " + clean_public_key))  # str.encode() to transform the string into bytes
+                
+            print("Public key sent")
+            print(pw_hash.hex() + " " + salt.hex())
 
             ans = bytes.decode(server_main_socket.recv(1))  # 1 byte is enough, it's the status of the query
             if ans == "0":
                 resp.configure(text='Username already used',  wraplength=200, fg='red')
 
             elif ans == "1":
-                resp.configure(text='Signup succesfull !',  wraplength=200, fg='green')
+                print(1)
+                get_symmetric_key_from_server(server_main_socket) # Waits for the server to send the encrypted symmetric key, decrypts it and stores it into a file symm_key.key
+
+                resp.configure(text='Signup successful !',  wraplength=200, fg='green')
+                time.sleep(3)
+                chat_init_gui()
             else:
                 raise Exception("Unexpected answer")
 

@@ -1,8 +1,14 @@
 #!/usr/bin/python3
 
-import socket, random
+import socket, random, secrets, hmac
 from _thread import *
 from connect import connect, disconnect
+from cryptography.fernet import Fernet
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives.asymmetric import rsa, padding
+from cryptography.hazmat.primitives import serialization, hashes
+from cryptography.exceptions import InvalidSignature
+
 clients = {} # List of clients connected with their username and their socket
 current_port = 0
 
@@ -48,6 +54,14 @@ def get_users_from_db() :
     cur.close()
     return cred
 
+def transform_string_to_key(public_key_string):
+    # Transforms the string version of the public key into a real cryptography public key
+    public_key_full = "-----BEGIN PUBLIC KEY-----\n" + public_key_string + "\n-----END PUBLIC KEY-----\n"
+    public_key = serialization.load_pem_public_key(
+        str.encode(public_key_full),
+        backend=default_backend()
+    )
+    return public_key
 
 def signup(main_connection):
     global db_connection
@@ -59,9 +73,14 @@ def signup(main_connection):
     # New version, using DB
     credentials = get_users_from_db()
 
-    received = bytes.decode(client_connection.recv(1024)).split(' ')
-    usr = received[0]
-    pswd = received[1]
+    usr, pswd, salt, public_key_string = bytes.decode(client_connection.recv(2048)).split(' ')
+    print(pswd)
+    print("Public key of user : " + public_key_string)
+    
+    # Generates the symmetric key for the connection with this user
+    symm_key = Fernet.generate_key()
+    print("Symmetric key for this connection : " + bytes.decode(symm_key))
+
     if usr in credentials: # User already exists
         cur.close() 
         main_connection.send(str.encode("0"))
@@ -70,24 +89,37 @@ def signup(main_connection):
     else:
         # First, insert new created profile in DB
         cur.execute("""
-        INSERT INTO users(username, password, created_on, last_login) 
-        VALUES ('{}','{}', now(), now());
-        """.format(usr, pswd))
+        INSERT INTO users(username, password, salt, created_on, last_login, client_public_key, symmetric_key)
+        VALUES ('{}','{}', '{}', now(), now(), '{}', '{}');
+        """.format(usr, pswd, salt, public_key_string, bytes.decode(symm_key)))
 
         # Commit change to DB 
         db_connection.commit() 
-        print("Normalement dans la DB ")
+        print("User ajouté dans la DB ")
         cur.close()
-        f = open("credentials.txt", "a")
-        f.write(usr + " " + pswd + "\n")
+        #f = open("credentials.txt", "a")
+        #f.write(usr + " " + pswd + "\n")
         
         # Then, send back message
         main_connection.send(str.encode("1"))
+        
+        public_key = transform_string_to_key(public_key_string)
+        encrypted_symm_key = public_key.encrypt(
+            symm_key, # The message to be encrypted is the symmetric key
+            padding.OAEP(
+                mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                algorithm=hashes.SHA256(),
+                label=None
+            )
+        )
+        
+        main_connection.send(encrypted_symm_key) # The encrypted key is already in bytes, no need to convert
+
         print("Signup successful")
         return usr
 
 
-def authentication(username, password) :
+def authentication(username, pw_hash) :
     """
     Gets the password from the DB and verifies it matches the entry
     """
@@ -98,10 +130,11 @@ def authentication(username, password) :
     SELECT password FROM users WHERE username = '{}'
     """.format(username)
     cur.execute(query)
-
-    res = cur.fetchone()[0]
-    print(password, res)
-    return password == res
+    res = cur.fetchone()
+    pw_hash_db = res[0]
+    
+    print(username, pw_hash, pw_hash_db)
+    return pw_hash == pw_hash_db
 
 def update_last_login(username) :
     # Updates the "last_login" timestamp attribute of the username in the DB
@@ -117,20 +150,45 @@ def update_last_login(username) :
     # A modification has been done : commit 
     db_connection.commit()
     return
+    
+def get_client_public_key(username):
+    global db_connection
+    cur = db_connection.cursor()
+    query = """
+    SELECT client_public_key FROM users WHERE username = '{}'
+    """.format(username)
+    cur.execute(query)
+
+    res = cur.fetchone()[0]
+    print("The public key of user " + username + " is " + res)
+    return transform_string_to_key(res)
+    
+def get_salt_from_db(username):
+    global db_connection
+    cur = db_connection.cursor()
+    query = """
+    SELECT salt FROM users WHERE username = '{}'
+    """.format(username)
+    cur.execute(query)
+
+    res = cur.fetchone()[0]
+    print("The salt of user " + username + " is " + res)
+    return res
 
 def login(main_connection):
     credentials = get_users_from_db()
     
-    received = bytes.decode(client_connection.recv(1024)).split(' ')
-    usr = received[0]
-    pswd = received[1]
+    usr = bytes.decode(client_connection.recv(1024))
+    client_connection.send(str.encode(get_salt_from_db(usr)))
+    
+    pswd_hashed = bytes.decode(client_connection.recv(1024))
     
     if usr not in credentials:
         client_connection.send(str.encode("0"))
         print("Login unsucessful")
         return -1, -1
 
-    pw_check = authentication(usr, pswd)    
+    pw_check = authentication(usr, pswd_hashed)
     if not pw_check:
         main_connection.send(str.encode("1"))
         print("Login unsucessful")
@@ -139,8 +197,35 @@ def login(main_connection):
         update_last_login(usr)
 
         main_connection.send(str.encode("2"))
-        print("Login successful")
-        return usr, new_socket_client(client_connection)
+        
+        nonce = secrets.token_urlsafe(32) # Generates a random nonce
+        print("Nonce : ", end='')
+        print(nonce)
+        main_connection.send(str.encode(nonce)) # And sends it to the client
+        
+        encrypted_private_key_nonce = client_connection.recv(1024)
+        print("Encrypted private key nonce : ", end='')
+        print(encrypted_private_key_nonce)
+        
+        public_key = get_client_public_key(usr)
+        try: # Checks encrypted_private_key_nonce is the signature of message nonce. If not, raises an invalid signature exception
+            public_key.verify( # See doc on https://cryptography.io/en/latest/hazmat/primitives/asymmetric/rsa/
+                encrypted_private_key_nonce,
+                str.encode(nonce),
+                padding.PSS(
+                    mgf=padding.MGF1(hashes.SHA256()),
+                    salt_length=padding.PSS.MAX_LENGTH
+                ),
+                hashes.SHA256()
+            )
+        except InvalidSignature:
+            main_connection.send(str.encode("0"))
+            print("Wrong client private key")
+            return -1, -1
+        else:
+            main_connection.send(str.encode("1"))
+            print("Login successful")
+            return usr, new_socket_client(client_connection)
         
 def server_listener(usr): # Listen to messages arriving from a client and displays them
     client_connection, client_listen_connection = clients[usr] # Gets the sending and listening connections for this user
