@@ -1,9 +1,12 @@
 #!/usr/bin/python3
 
-import socket, time
+import socket, time, os.path
 from _thread import *
 import tkinter as tk
 from tkinter import scrolledtext
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives import serialization
 
 font = "Arial Black"
 
@@ -172,7 +175,63 @@ def chat_init_gui():
     tk.Label(root, text='Logged In as : \n' + usr, font=(font, 10)).place(x=400, y=360)
 
     root.mainloop()
+    
+def generate_keys(): # Source of this function : https://nitratine.net/blog/post/asymmetric-encryption-and-decryption-in-python/
 
+    # Generates the private and public keys
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+        backend=default_backend()
+    )
+    public_key = private_key.public_key()
+    
+    # Write the private key in private_key.pem
+    pem = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption()
+    )
+    with open('private_key.pem', 'wb') as f:
+        f.write(pem)
+        
+    # Write the public key in public_key.pem
+    pem = public_key.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+    with open('public_key.pem', 'wb') as f:
+        f.write(pem)
+        
+def get_keys(): # Source of this function : https://nitratine.net/blog/post/asymmetric-encryption-and-decryption-in-python/
+    if not os.path.exists("private_key.pem") or not os.path.exists("public_key.pem"):
+        return -1, -1 # Private and public keys are not created yet
+    
+    with open("private_key.pem", "rb") as key_file:
+        private_key = serialization.load_pem_private_key(
+            key_file.read(),
+            password=None,
+            backend=default_backend()
+        )
+    
+    with open("public_key.pem", "rb") as key_file:
+        public_key = serialization.load_pem_public_key(
+            key_file.read(),
+            backend=default_backend()
+        )
+    return private_key, public_key
+    
+def read_keys(): # Source of this function : https://nitratine.net/blog/post/asymmetric-encryption-and-decryption-in-python/
+    if not os.path.exists("private_key.pem") or not os.path.exists("public_key.pem"):
+        return -1, -1 # Private and public keys are not created yet
+    
+    key_file = open("private_key.pem", "r")
+    private_key = key_file.read()
+    
+    key_file = open("public_key.pem", "r")
+    public_key = key_file.read()
+        
+    return private_key, public_key
 
 def register_gui():
     global root
@@ -209,11 +268,24 @@ def register_gui():
         if not check_credentials(usr, pswd):
             resp.configure(text="A username can't start with a digit or be longer than 10 characters",  wraplength=200, fg='red')
         else:
+            private_key, public_key = read_keys() # Gets the public and private keys if already created
+            if private_key == -1: # If they doesn't exist yet
+                print("Asymetric keys doesn't exist yet, creating them")
+                generate_keys() # Generates the public and private keys and store them into files
+                private_key, public_key = read_keys()
+                
+            clean_public_key = (public_key.split('-')[10]).strip() # Removes the "-----BEGIN PUBLIC KEY----" and "----END PUBLIC KEY----"
+                
+            print("Public key : " + public_key)
+            print(clean_public_key)
+            print("Private key : " + private_key)
+            
             server_main_socket = connect_to_server(ip, 10000)  # The server port number to connect is 10000
 
             server_main_socket.send(str.encode("1"))  # Code stating we want to sign up
             server_main_socket.send(
-                str.encode(str(usr) + " " + str(pswd)))  # str.encode() to transform the string into bytes
+                str.encode(usr + " " + pswd + " " + clean_public_key))  # str.encode() to transform the string into bytes
+            print("Public key sent")
 
             ans = bytes.decode(server_main_socket.recv(1))  # 1 byte is enough, it's the status of the query
             if ans == "0":

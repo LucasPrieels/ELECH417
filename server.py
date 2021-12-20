@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import socket, random
+import socket, random, secrets
 from _thread import *
 from connect import connect, disconnect
 clients = {} # List of clients connected with their username and their socket
@@ -59,9 +59,9 @@ def signup(main_connection):
     # New version, using DB
     credentials = get_users_from_db()
 
-    received = bytes.decode(client_connection.recv(1024)).split(' ')
-    usr = received[0]
-    pswd = received[1]
+    usr, pswd, public_key = bytes.decode(client_connection.recv(1024)).split(' ')
+    print("Public key : " + public_key)
+
     if usr in credentials: # User already exists
         cur.close() 
         main_connection.send(str.encode("0"))
