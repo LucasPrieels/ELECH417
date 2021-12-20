@@ -18,7 +18,7 @@ def login(ip):
     print("####### LOGIN #######")
     usr = input("Username : ")
     pswd = input("Password : ")
-    server_main_socket = connect_to_server(ip, 10000) # The server port number to connect is 10000
+    server_main_socket = connect_to_server(ip, 10001) # The server port number to connect is 10001
 
     server_main_socket.send(str.encode("0")) # Code stating we want to login
     server_main_socket.send(str.encode(str(usr) + " " + str(pswd))) # str.encode() to transform the string into bytes
@@ -51,7 +51,7 @@ def signup(ip):
         pswd = input("Password : ")
         valid_credentials = check_credentials(usr, pswd)
         
-    server_main_socket = connect_to_server(ip, 10000) # The server port number to connect is 10000
+    server_main_socket = connect_to_server(ip, 10001) # The server port number to connect is 10001
     
     server_main_socket.send(str.encode("1")) # Code stating we want to sign up
     server_main_socket.send(str.encode(str(usr) + " " + str(pswd))) # str.encode() to transform the string into bytes
