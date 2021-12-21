@@ -1,5 +1,4 @@
 database.ini
-private_key.pem
-public_key.pem
-symm_key.key
+*_key.pem
+symmetric_keys_*
 __pycache__

@@ -65,27 +65,6 @@ def generate_symmetric_key(usr, remote_usr, public_key_string):
         
     return encrypted_symm_key
 
-def listen_for_messages(): # Listen from messages from the server and displays them
-    print("Listening for messages...")
-    sender = bytes.decode(server_main_socket.recv(10))
-    print("Sender : " + sender)
-    if sender == "1NEW": # Create a new contact
-        #server_main_socket.send(str.encode("1")) # Confirmation
-        sender = bytes.decode(server_main_socket.recv(10))
-        print("Received a 1NEW query from " + sender)
-        public_key = bytes.decode(server_main_socket.recv(1024))
-        print("Received public key : ", end='')
-        print(public_key)
-        encrypted_symm_key = generate_symmetric_key(usr, sender, public_key)
-        print("Encrypted symmetric key : ", end='')
-        print(encrypted_symm_key)
-        server_main_socket.send(encrypted_symm_key)
-    if disconnection: # If the user wants to be disconnected we stop receiving data for this user
-        print("Disconnection")
-        return
-    data = bytes.decode(server_main_socket.recv(2048))
-    print("From user " + sender + " : " + data)
-
 #GUI
 
 def init_gui():
@@ -129,7 +108,7 @@ def init_contacts(usr):
     with open("symmetric_keys_" + usr + ".txt", 'r') as f:
         for line in f.readlines():
             contact, symm_key = line.split(' ')
-            symm_keys[contact] = symm_key
+            symm_keys[contact] = symm_key.strip() # Removes newline
 
 def login_gui():
     global root
@@ -196,7 +175,7 @@ def login_gui():
                 init_contacts(usr)
                 print("Contacts : ", end='')
                 print(symm_keys)
-                start_new_thread(listen_for_messages, ())
+                #start_new_thread(listen_for_messages, ())
                 chat_init_gui()
         else:
             raise Exception("Unexpected answer")
@@ -252,20 +231,33 @@ def chat_init_gui():
 
     def receive():  # Listen from messages from the server and displays them
         while True:
+            print("Listening for messages...")
+            sender = bytes.decode(server_main_socket.recv(10))
+            print("Sender : " + sender)
+            if disconnection: # If the user wants to be disconnected we stop receiving data for this user
+                print("Disconnection")
+                return
+            if sender == "1NEW": # Create a new contact
+                #server_main_socket.send(str.encode("1")) # Confirmation
+                sender = bytes.decode(server_main_socket.recv(10))
+                print("Received a 1NEW query from " + sender)
+                public_key = bytes.decode(server_main_socket.recv(1024))
+                print("Received public key : ", end='')
+                print(public_key)
+                encrypted_symm_key = generate_symmetric_key(usr, sender, public_key)
+                print("Encrypted symmetric key : ", end='')
+                print(encrypted_symm_key)
+                server_main_socket.send(encrypted_symm_key)
+            else :
+                data = bytes.decode(server_main_socket.recv(2048))
+                print("From user " + sender + " : " + data)
 
-            user_from = bytes.decode(server_main_socket.recv(10))
-
-            
-
-            data = bytes.decode(server_main_socket.recv(2048))
-
-
-            text.configure(state=tk.NORMAL)
-            text.insert(tk.INSERT, '[' + user_from + ']', 'name')
-            text.insert(tk.INSERT, data + "\n", 'message')
-            text.tag_config('name', foreground="green", font=(font, 14, 'bold'))
-            text.tag_config('message', foreground="green")
-            text.configure(state=tk.DISABLED)
+                text.configure(state=tk.NORMAL)
+                text.insert(tk.INSERT, '[' + sender + ']', 'name')
+                text.insert(tk.INSERT, data + "\n", 'message')
+                text.tag_config('name', foreground="green", font=(font, 14, 'bold'))
+                text.tag_config('message', foreground="green")
+                text.configure(state=tk.DISABLED)
 
     def refresh():
         
@@ -314,7 +306,7 @@ def chat_init_gui():
 
     ########################################################@
 
-    users = ["Karim", "Mahmoud", "Jean", "julien", "nico"]
+    users = ["Karim", "Mahmoud", "Jean", "julien", "nico", "sami"]
     i = 0
 
     while i < len(users):
