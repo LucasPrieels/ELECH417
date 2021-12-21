@@ -8,6 +8,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives import serialization, hashes
 
+
 font = "Arial Black"
 disconnection = False # It is put to True when the user wants to be disconnected
 
@@ -154,6 +155,18 @@ def login_gui():
     root.mainloop()
 
 
+def get_history_from_server(username1, username2) :
+
+    # Ask server to show history
+    server_listen_socket.send(str.encode("2HISTORY"))
+    time.sleep(0.1)
+    # Sends the concerned usernames
+    server_listen_socket.send(str.encode(username1))
+    time.sleep(0.1)
+    server_listen_socket.send(str.encode(username2))
+
+    return 
+
 def chat_init_gui():
     global root
     global user_to
@@ -180,6 +193,9 @@ def chat_init_gui():
         while True:
 
             user_from = bytes.decode(server_main_socket.recv(10))
+
+            
+
             data = bytes.decode(server_main_socket.recv(2048))
 
 
@@ -191,6 +207,13 @@ def chat_init_gui():
             text.configure(state=tk.DISABLED)
 
     def refresh():
+        
+        print(user_to)  
+        print(usr)
+        
+
+        get_history_from_server(username1=usr, username2=user_to)
+
         text.configure(state=tk.NORMAL)
         text.delete("1.0","end")
         text.configure(state=tk.DISABLED)
