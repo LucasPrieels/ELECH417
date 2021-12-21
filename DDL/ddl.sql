@@ -6,6 +6,5 @@ CREATE TABLE users(
     salt VARCHAR(64) NOT NULL,
     created_on TIMESTAMP NOT NULL,
     last_login TIMESTAMP NOT NULL,
-    client_public_key VARCHAR(2048) NOT NULL,
-    symmetric_key VARCHAR(64) NOT NULL
+    client_public_key VARCHAR(2048) NOT NULL
 );

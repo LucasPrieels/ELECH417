@@ -4,13 +4,14 @@ import socket, time, os, hashlib
 from _thread import *
 import tkinter as tk
 from tkinter import scrolledtext
+from cryptography.fernet import Fernet
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives import serialization, hashes
 
 font = "Arial Black"
 disconnection = False # It is put to True when the user wants to be disconnected
-
+symm_keys = {}
 
 def connect_to_server(ip, remote_port):
     s = socket.socket() # Remote socket
@@ -27,16 +28,62 @@ def check_credentials(usr, pswd):
     if (usr[0]).isdigit() or len(usr) > 10 or len(usr) == 0 or len(pswd) < 3: # A username can't start with a digit or be longer than 10 characters and a pasword can't be shorter than 3 characters
         return False
     return True
+    
+def transform_string_to_key(public_key_string):
+    # Transforms the string version of the public key into a real cryptography public key
+    public_key_full = "-----BEGIN PUBLIC KEY-----\n" + public_key_string + "\n-----END PUBLIC KEY-----\n"
+    public_key = serialization.load_pem_public_key(
+        str.encode(public_key_full),
+        backend=default_backend()
+    )
+    return public_key
 
+def generate_symmetric_key(usr, remote_usr, public_key_string):
+    # Generates the symmetric key for the connection with this user
+    symm_key = Fernet.generate_key()
+    print("Symmetric key for this connection : " + bytes.decode(symm_key))
+    
+    public_key = transform_string_to_key(public_key_string)
+    encrypted_symm_key = public_key.encrypt(
+        symm_key, # The message to be encrypted is the symmetric key
+        padding.OAEP(
+            mgf=padding.MGF1(algorithm=hashes.SHA256()),
+            algorithm=hashes.SHA256(),
+            label=None
+        )
+    )
+    
+    if not os.path.exists("symmetric_keys_" + usr + ".txt"): # If the file doesn't exist yet, create it
+        with open("symmetric_keys_" + usr + ".txt", 'w') as f:
+            f.write("")
+        
+    with open("symmetric_keys_" + usr + ".txt", "a") as f:
+        print("Writing user " + remote_usr + " with key " + bytes.decode(symm_key))
+        f.write(remote_usr + " " + bytes.decode(symm_key) + "\n")
+        symm_keys[usr] = symm_key
+        
+    return encrypted_symm_key
 
 def listen_for_messages(): # Listen from messages from the server and displays them
+    print("Listening for messages...")
     sender = bytes.decode(server_main_socket.recv(10))
-    while True:
-        if disconnection: # If the user wants to be disconnected we stop receiving data for this user
-            print("Disconnection")
-            return
-        data = bytes.decode(server_main_socket.recv(2048))
-        print("From user " + sender + " : " + data)
+    print("Sender : " + sender)
+    if sender == "1NEW": # Create a new contact
+        #server_main_socket.send(str.encode("1")) # Confirmation
+        sender = bytes.decode(server_main_socket.recv(10))
+        print("Received a 1NEW query from " + sender)
+        public_key = bytes.decode(server_main_socket.recv(1024))
+        print("Received public key : ", end='')
+        print(public_key)
+        encrypted_symm_key = generate_symmetric_key(usr, sender, public_key)
+        print("Encrypted symmetric key : ", end='')
+        print(encrypted_symm_key)
+        server_main_socket.send(encrypted_symm_key)
+    if disconnection: # If the user wants to be disconnected we stop receiving data for this user
+        print("Disconnection")
+        return
+    data = bytes.decode(server_main_socket.recv(2048))
+    print("From user " + sender + " : " + data)
 
 #GUI
 
@@ -55,8 +102,6 @@ def authenticate_nonce(server_main_socket, private_key):
     nonce = server_main_socket.recv(64) # No need to convert in str
     print("Nonce : ", end='')
     print(nonce)
-    print("Private key : ", end='')
-    print(private_key)
     
     encrypted_private_key_nonce = private_key.sign( # See doc on https://cryptography.io/en/latest/hazmat/primitives/asymmetric/rsa/
         nonce,
@@ -75,6 +120,15 @@ def authenticate_nonce(server_main_socket, private_key):
     a = bytes.decode(server_main_socket.recv(1))
     print(a)
     return a == "1"
+    
+def init_contacts(usr):
+    if not os.path.exists("symmetric_keys_" + usr + ".txt"): # If the file doesn't exist yet, create it
+        with open("symmetric_keys_" + usr + ".txt", 'w') as f:
+            f.write("")
+    with open("symmetric_keys_" + usr + ".txt", 'r') as f:
+        for line in f.readlines():
+            contact, symm_key = line.split(' ')
+            symm_keys[contact] = symm_key
 
 def login_gui():
     global root
@@ -107,6 +161,7 @@ def login_gui():
     def login(ip):
         global usr
         global server_listen_socket
+        global server_main_socket
 
         usr = user_entry.get()
         pswd = pass_entry.get()
@@ -135,6 +190,10 @@ def login_gui():
                 remote_port = bytes.decode(server_main_socket.recv(
                     4))  # 4 bytes for a port number between 2000 and 3000 (in string format so each character takes a byte)
                 server_listen_socket = connect_to_server(ip,int(remote_port))  # Connect to the new port specific for this client, given by the server
+                init_contacts(usr)
+                print("Contacts : ", end='')
+                print(symm_keys)
+                start_new_thread(listen_for_messages, ())
                 chat_init_gui()
         else:
             raise Exception("Unexpected answer")
@@ -155,8 +214,8 @@ def login_gui():
 def chat_init_gui():
     global root
     global usr
-    #global user_to
-    #user_to = usr # juste pour tester
+    global user_to
+    user_to = usr # juste pour tester
     root.destroy()
     root = tk.Tk()
     root.title('Chat')
@@ -169,9 +228,6 @@ def chat_init_gui():
     text.place(x=10, y=40)
     text.yview(tk.END)
     text.configure(state=tk.NORMAL)
-
-    text.insert(tk.INSERT, "J'adore les gros chibre" + '\n')
-    text.insert(tk.INSERT, "J'adore les gros chibre")
     text.configure(state=tk.DISABLED)
 
     msg_entry = tk.Entry(root, font=(font, 13), width=25)
@@ -190,6 +246,8 @@ def chat_init_gui():
 
     def send():  # Listen for the client's input and sends it to the server
         data = msg_entry.get()
+        server_listen_socket.send(str.encode(user_to))
+        time.sleep(0.1)
         server_listen_socket.send(str.encode(data))  # Send message
         print("message envoyé")
         msg_entry.delete(0, 'end')
@@ -198,7 +256,7 @@ def chat_init_gui():
                            command=send)
     sendbutton.place(x=300, y=365)
 
-    sendto_label = tk.Label(root, font=(font, 13), bg='blue', fg='black', text="Send to " + user_to, width=15)
+    sendto_label = tk.Label(root, font=(font, 13), bg='blue', fg='black', text=user_to, width=15)
     sendto_label.place(y=40, x=400)
 
     tk.Label(root, font=(font, 13), bg='Green', fg='black', text='Users', width=10).place(y=200, x=400)
@@ -211,7 +269,7 @@ def chat_init_gui():
     active_users = tk.Listbox(root, height=8, width=20)
     active_users.place(x=400, y=230)
 
-    users = ["Karim", "Mahmoud", "Jean", "Jacques"]
+    users = ["a1", "Mahmoud", "Jean", "Jacques"]
     i = 0
     while i < len(users):
         active_users.insert(i + 1, users[i])
@@ -222,7 +280,32 @@ def chat_init_gui():
         if selection:
             index = selection[0]
             data = event.widget.get(index)
-            sendto_label.configure(text="Send to " + data)
+            print("Data : " + data)
+            #server_listen_socket.send(str.encode(data))
+            #print(server_main_socket.recv(1))
+            #server_listen_socket.send(str.encode("Ceci est un message de test"))
+            time.sleep(0.1)
+            if data not in symm_keys:
+                print("We don't have a symmetric key for the connection with user " + data)
+                print("Sending a 1NEW query")
+                server_listen_socket.send(str.encode("1NEW"))
+                time.sleep(0.1)
+                print("Sending it to user " + data)
+                server_listen_socket.send(str.encode(data))
+                
+                private_key, public_key = get_keys()
+                symm_key = get_symmetric_key_from_server(server_main_socket, public_key)
+                
+                if not os.path.exists("symmetric_keys_" + usr + ".txt"): # If the file doesn't exist yet, create it
+                    with open("symmetric_keys_" + usr + ".txt", 'w') as f:
+                        f.write("")
+            
+                with open("symmetric_keys_" + usr + ".txt", "a") as f:
+                    print("Writing user " + data + " with key " + symm_key)
+                    f.write(data + " " + symm_key + "\n")
+                    symm_keys[data] = symm_key
+            
+            sendto_label.configure(text=data)
         else:
             sendto_label.configure(text="")
 
@@ -260,7 +343,7 @@ def generate_keys(): # Source of this function : https://nitratine.net/blog/post
         
 def get_keys(): # Source of this function : https://nitratine.net/blog/post/asymmetric-encryption-and-decryption-in-python/
     if not os.path.exists("private_key.pem") or not os.path.exists("public_key.pem"):
-        print("Asymetric keys doesn't exist yet, creating them...")
+        print("Asymetric keys don't exist yet, creating them...")
         generate_keys() # Generates the public and private keys and store them into files
     
     with open("private_key.pem", "rb") as key_file:
@@ -281,7 +364,7 @@ def get_keys(): # Source of this function : https://nitratine.net/blog/post/asym
 def read_keys(): # Source of this function : https://nitratine.net/blog/post/asymmetric-encryption-and-decryption-in-python/
     print("Read keys : " + str(os.path.exists("private_key.pem")))
     if not os.path.exists("private_key.pem") or not os.path.exists("public_key.pem"):
-        print("Asymetric keys doesn't exist yet, creating them...")
+        print("Asymetric keys don't exist yet, creating them...")
         generate_keys() # Generates the public and private keys and store them into files
     
     key_file = open("private_key.pem", "r")
@@ -292,9 +375,12 @@ def read_keys(): # Source of this function : https://nitratine.net/blog/post/asy
         
     return private_key, public_key
     
-def get_symmetric_key_from_server(server_main_socket):
+def get_symmetric_key_from_server(server_main_socket, public_key):
     encrypted_symm_key = server_main_socket.recv(1024) # The key can stay in bytes, no need to convert in str
-                
+    
+    print("Got encrypted symm key : ", end='')
+    print(encrypted_symm_key)
+    
     private_key, public_key = get_keys()
     symm_key = private_key.decrypt(
         encrypted_symm_key,
@@ -304,10 +390,10 @@ def get_symmetric_key_from_server(server_main_socket):
             label=None
         )
     )
-    print("Symmetric key : " + bytes.decode(symm_key))
+    symm_key = bytes.decode(symm_key)
+    print("Decrypted symmetric key : " + symm_key)
     
-    with open("symm_key.key", "wb") as symm_key_file:
-        symm_key_file.write(symm_key)
+    return symm_key
 
 def register_gui():
     global root
@@ -372,9 +458,6 @@ def register_gui():
                 resp.configure(text='Username already used',  wraplength=200, fg='red')
 
             elif ans == "1":
-                print(1)
-                get_symmetric_key_from_server(server_main_socket) # Waits for the server to send the encrypted symmetric key, decrypts it and stores it into a file symm_key.key
-
                 resp.configure(text='Signup successful !',  wraplength=200, fg='green')
                 time.sleep(3)
                 chat_init_gui()

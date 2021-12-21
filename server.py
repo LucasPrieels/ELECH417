@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import socket, random, secrets, hmac
+import socket, random, secrets, hmac, time
 from _thread import *
 from connect import connect, disconnect
 from cryptography.fernet import Fernet
@@ -54,15 +54,6 @@ def get_users_from_db() :
     cur.close()
     return cred
 
-def transform_string_to_key(public_key_string):
-    # Transforms the string version of the public key into a real cryptography public key
-    public_key_full = "-----BEGIN PUBLIC KEY-----\n" + public_key_string + "\n-----END PUBLIC KEY-----\n"
-    public_key = serialization.load_pem_public_key(
-        str.encode(public_key_full),
-        backend=default_backend()
-    )
-    return public_key
-
 def signup(main_connection):
     global db_connection
     
@@ -76,10 +67,6 @@ def signup(main_connection):
     usr, pswd, salt, public_key_string = bytes.decode(client_connection.recv(2048)).split(' ')
     print(pswd)
     print("Public key of user : " + public_key_string)
-    
-    # Generates the symmetric key for the connection with this user
-    symm_key = Fernet.generate_key()
-    print("Symmetric key for this connection : " + bytes.decode(symm_key))
 
     if usr in credentials: # User already exists
         cur.close() 
@@ -89,9 +76,9 @@ def signup(main_connection):
     else:
         # First, insert new created profile in DB
         cur.execute("""
-        INSERT INTO users(username, password, salt, created_on, last_login, client_public_key, symmetric_key)
-        VALUES ('{}','{}', '{}', now(), now(), '{}', '{}');
-        """.format(usr, pswd, salt, public_key_string, bytes.decode(symm_key)))
+        INSERT INTO users(username, password, salt, created_on, last_login, client_public_key)
+        VALUES ('{}','{}', '{}', now(), now(), '{}');
+        """.format(usr, pswd, salt, public_key_string))
 
         # Commit change to DB 
         db_connection.commit() 
@@ -102,18 +89,6 @@ def signup(main_connection):
         
         # Then, send back message
         main_connection.send(str.encode("1"))
-        
-        public_key = transform_string_to_key(public_key_string)
-        encrypted_symm_key = public_key.encrypt(
-            symm_key, # The message to be encrypted is the symmetric key
-            padding.OAEP(
-                mgf=padding.MGF1(algorithm=hashes.SHA256()),
-                algorithm=hashes.SHA256(),
-                label=None
-            )
-        )
-        
-        main_connection.send(encrypted_symm_key) # The encrypted key is already in bytes, no need to convert
 
         print("Signup successful")
         return usr
@@ -151,6 +126,15 @@ def update_last_login(username) :
     db_connection.commit()
     return
     
+def transform_string_to_key(public_key_string):
+    # Transforms the string version of the public key into a real cryptography public key
+    public_key_full = "-----BEGIN PUBLIC KEY-----\n" + public_key_string + "\n-----END PUBLIC KEY-----\n"
+    public_key = serialization.load_pem_public_key(
+        str.encode(public_key_full),
+        backend=default_backend()
+    )
+    return public_key
+    
 def get_client_public_key(username):
     global db_connection
     cur = db_connection.cursor()
@@ -161,7 +145,7 @@ def get_client_public_key(username):
 
     res = cur.fetchone()[0]
     print("The public key of user " + username + " is " + res)
-    return transform_string_to_key(res)
+    return res
     
 def get_salt_from_db(username):
     global db_connection
@@ -210,7 +194,7 @@ def login(main_connection):
         print("Encrypted private key nonce : ", end='')
         print(encrypted_private_key_nonce)
         
-        public_key = get_client_public_key(usr)
+        public_key = transform_string_to_key(get_client_public_key(usr))
         try: # Checks encrypted_private_key_nonce is the signature of message nonce. If not, raises an invalid signature exception
             public_key.verify( # See doc on https://cryptography.io/en/latest/hazmat/primitives/asymmetric/rsa/
                 encrypted_private_key_nonce,
@@ -234,24 +218,39 @@ def server_listener(usr): # Listen to messages arriving from a client and displa
     client_connection, client_listen_connection = clients[usr] # Gets the sending and listening connections for this user
     while True:
         recipient = bytes.decode(client_listen_connection.recv(10))
-        print(recipient)
+        print("Message for : " + recipient)
         if recipient == "" or recipient == ".": # Code for the client to be disconnected
             print("User " + usr + " disconnected")
             clients.pop(usr) # Remove the client from the list of active users
             break # Stop listening to this client
+        elif recipient == "1NEW": # Code to connect to a new contact
+            #client_listen_connection.send(str.encode("1"))
+            recipient = bytes.decode(client_listen_connection.recv(10))
+            recipient_connection, recipient_listen_connection = clients[recipient]
+            print("Sending code 1NEW to recpient " + recipient)
+            recipient_connection.send(str.encode("1NEW"))
+            time.sleep(0.1)
+            print("Sending the sender of the query : " + usr)
+            recipient_connection.send(str.encode(usr))
+            time.sleep(0.1)
+            print("Sending public key of user " + usr)
+            recipient_connection.send(str.encode(get_client_public_key(usr)))
+            encrypted_symm_key = recipient_connection.recv(1024)
+            print("Received encrypted symmetric key : ", end='')
+            print(encrypted_symm_key)
+            print("Forwarding the symmetric key to " + usr)
+            client_connection.send(encrypted_symm_key) # Retransmit the reply of the recipient to the client (the encrypted symmetric key or an error message)
         elif recipient not in clients:
             client_listen_connection.send(str.encode("0")) # The user which need to be contacted doesn't exist or is not connected
         else:
             client_listen_connection.send(str.encode("1"))
             recipient_connection, recipient_listen_connection = clients[recipient]
             recipient_connection.send(str.encode(usr))
-            while True:
-                data = bytes.decode(client_listen_connection.recv(2048))
-                print("From user " + usr + " : " + data)
-                if data == "" or data == ".": # Stop communication with this recipient
-                    print("Change of conversation")
-                    break
-                recipient_connection.send(str.encode(data))
+            print("Forwarding a message from user " + usr + " to " + recipient + " : ", end='')
+            
+            data = bytes.decode(client_listen_connection.recv(2048))
+            print(data)
+            recipient_connection.send(str.encode(data))
 
 main_socket = create_new_socket(10000) # Main socket, used by the server to send data and to listen to new connections. Port number is 10 000 by definition
 db_connection = connect()
@@ -266,7 +265,7 @@ while True:
         if usr == -1:
             continue # Login unsucessful
         else:
-            client_listen_connection, address = socket_client.accept() # From now on, listen on connection client_listen_connection and send on client_connection. Address is the same as before since it's the same cliet
+            client_listen_connection, address = socket_client.accept() # From now on, listen on connection client_listen_connection and send on client_connection. Address is the same as before since it's the same client
             clients[usr] = (client_connection, client_listen_connection) # Add the user to the list of connected users
             print(clients)
             start_new_thread(server_listener, (usr,))
