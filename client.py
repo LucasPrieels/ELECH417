@@ -10,12 +10,30 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives import serialization, hashes
 import datetime
+import pygame
 import ast
 
 
 font = "Arial Black"
 disconnection = False # It is put to True when the user wants to be disconnected
 symm_keys = {}
+
+def center():
+    global root
+    # Gets the requested values of the height and widht.
+    windowWidth = root.winfo_reqwidth()
+    windowHeight = root.winfo_reqheight()
+    print("Width", windowWidth, "Height", windowHeight)
+    print(root.winfo_screenwidth())
+
+    # Gets both half the screen width/height and window width/height
+    positionRight = int(root.winfo_screenwidth() / 2 - windowWidth / 2)
+    positionDown = int(root.winfo_screenheight() / 2 - windowHeight / 2)
+
+    # Positions the window in the center of the page.
+    root.geometry("+{}+{}".format(positionRight, positionDown))
+
+
 
 def connect_to_server(ip, remote_port):
     s = socket.socket() # Remote socket
@@ -70,14 +88,43 @@ def generate_symmetric_key(usr, remote_usr, public_key_string):
 
 #GUI
 
+def mute_unmute():
+    if pygame.mixer.music.get_volume() > 0:
+        pygame.mixer.music.set_volume(0)
+    else:
+        pygame.mixer.music.set_volume(1)
+
+
+
+
 def init_gui():
     global root
     root = tk.Tk()
-    root.geometry('400x150')
+    root.geometry('600x400')
+    root.resizable(False, False)
     root.title('login signup')
 
-    tk.Button(root, text="Login", command=login_gui).grid(row=4, column=0)
-    tk.Button(root, text="Register", command=register_gui).grid(row=4, column=2)
+    pygame.init()
+    pygame.mixer.music.load('audio/login.mp3')
+    pygame.mixer.music.play(-1)
+
+
+
+
+    bg = tk.PhotoImage(file="images/home.png")
+    bg = bg.zoom(1)  # with 250, I ended up running out of memory
+    bg = bg.subsample(6)
+    label1 = tk.Label(root, image=bg)
+    label1.place(x=0, y=0)
+
+    buttonlogin = tk.Button(root, text="Login", command=login_gui)
+    buttonregister = tk.Button(root, text="Register", command=register_gui)
+    buttonmusic = tk.Button(root, text="music", command=mute_unmute)
+
+    buttonlogin.place(x=310, y=280)
+    buttonregister.place(x=300, y=200)
+    buttonmusic.place(x=110,y=120)
+
 
     root.mainloop()
 
@@ -121,6 +168,7 @@ def login_gui():
 
     root.destroy()
     root = tk.Tk()
+    center()
 
     root.title('Login')
     root.geometry('300x300+220+170')
@@ -216,13 +264,14 @@ def chat_init_gui():
     global root
     global usr
     global user_to
+
+    pygame.mixer.music.stop()
     
     user_to = usr
     root.destroy()
     root = tk.Tk()
     root.title('Chat')
     root.geometry('600x400')
-    root.configure(bg='white')
     root.resizable(False, False)
 
 
@@ -293,6 +342,8 @@ def chat_init_gui():
                 text.tag_config('message', foreground="green")
                 text.configure(state=tk.DISABLED)
 
+                receive_sound = pygame.mixer.Sound("audio/receive.wav")
+                pygame.mixer.Sound.play(receive_sound)
 
     def send():  # Listen for the client's input and sends it to the server
         data = msg_entry.get()
@@ -528,10 +579,14 @@ def register_gui():
     root.destroy()
     root = tk.Tk()
 
+
+
     root.title('Register')
     root.geometry('300x300+220+170')
     root.configure(bg='white')
     root.resizable(False, False)
+
+    center()
 
     log_label = tk.Label(root, text='Register', width=20, height=1, font=(font, 20, 'bold'))
     log_label.pack()
