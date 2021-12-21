@@ -248,6 +248,12 @@ def chat_init_gui():
                 print("Encrypted symmetric key : ", end='')
                 print(encrypted_symm_key)
                 server_main_socket.send(encrypted_symm_key)
+            if sender == "2HISTORY" :
+                print("Received history from server : ")
+                sender = bytes.decode(server_main_socket.recv(2048))
+                print(sender)
+                #history_cleaned = (str(sender)[1:-1].split(","))
+
             else :
                 data = bytes.decode(server_main_socket.recv(2048))
                 print("From user " + sender + " : " + data)
