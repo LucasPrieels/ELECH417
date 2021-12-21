@@ -9,6 +9,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.exceptions import InvalidSignature
 
+
 clients = {} # List of clients connected with their username and their socket
 current_port = 0
 
