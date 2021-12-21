@@ -233,6 +233,8 @@ def display_history_of(id1, id2) :
     WHERE ((m.from_id = {} AND m.to_id = {})
         OR (m.from_id = {} AND m.to_id = {}))
         AND (m.from_id = u1.user_id AND m.to_id = u2.user_id)
+        
+    ORDER BY time
          ;
     """.format(id1, id2, id2, id1)
 
@@ -283,7 +285,9 @@ def server_listener(usr): # Listen to messages arriving from a client and displa
             history = display_history_of(id1, id2)
 
             ## A toi de jouer nico
-            print(history)
+            recipient = username1
+            recipient_connection, recipient_listen_connection = clients[recipient]
+            recipient_connection.send(str(history))
 
         elif recipient not in clients:
             client_listen_connection.send(str.encode("0")) # The user which need to be contacted doesn't exist or is not connected

@@ -276,6 +276,7 @@ def chat_init_gui():
         text.delete("1.0","end")
         text.configure(state=tk.DISABLED)
 
+
     def send():  # Listen for the client's input and sends it to the server
         data = msg_entry.get()
         server_listen_socket.send(str.encode(user_to))
