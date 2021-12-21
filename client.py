@@ -155,8 +155,10 @@ def login_gui():
 def chat_init_gui():
     global root
     global usr
-    #global user_to
-    #user_to = usr # juste pour tester
+    global user_to
+    global server_listen_socket
+
+    user_to = usr # juste pour tester
     root.destroy()
     root = tk.Tk()
     root.title('Chat')
@@ -213,6 +215,7 @@ def chat_init_gui():
 
     users = ["Karim", "Mahmoud", "Jean", "Jacques"]
     i = 0
+
     while i < len(users):
         active_users.insert(i + 1, users[i])
         i += 1
@@ -227,6 +230,7 @@ def chat_init_gui():
             sendto_label.configure(text="")
 
     active_users.bind("<Double-1>", callback)   #Get the user we click on
+
     user_to = sendto_label.cget("text")         #Update the user we want to talk to
 
     root.mainloop()
@@ -376,8 +380,6 @@ def register_gui():
                 get_symmetric_key_from_server(server_main_socket) # Waits for the server to send the encrypted symmetric key, decrypts it and stores it into a file symm_key.key
 
                 resp.configure(text='Signup successful !',  wraplength=200, fg='green')
-                time.sleep(3)
-                chat_init_gui()
             else:
                 raise Exception("Unexpected answer")
 
