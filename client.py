@@ -249,12 +249,17 @@ def chat_init_gui():
                 print(encrypted_symm_key)
                 server_main_socket.send(encrypted_symm_key)
             else :
-                data = bytes.decode(server_main_socket.recv(2048))
-                print("From user " + sender + " : " + data)
+                data = server_main_socket.recv(2048)
+                f = Fernet(symm_keys[sender])
+                print("Symmetric key for user " + user_to + " : " + symm_keys[sender])
+                print("Message to decrypt : ", end='')
+                print(data)
+                decrypted_message = bytes.decode(f.decrypt(data))
+                print("Message decrypted : " + decrypted_message)
 
                 text.configure(state=tk.NORMAL)
                 text.insert(tk.INSERT, '[' + sender + ']', 'name')
-                text.insert(tk.INSERT, data + "\n", 'message')
+                text.insert(tk.INSERT, decrypted_message + "\n", 'message')
                 text.tag_config('name', foreground="green", font=(font, 14, 'bold'))
                 text.tag_config('message', foreground="green")
                 text.configure(state=tk.DISABLED)
@@ -275,7 +280,13 @@ def chat_init_gui():
         data = msg_entry.get()
         server_listen_socket.send(str.encode(user_to))
         time.sleep(0.1) # to avoid merge of user and data
-        server_listen_socket.send(str.encode(data))  # Send message
+        f = Fernet(symm_keys[user_to])
+        print("Symmetric key for user " + user_to + " : " + symm_keys[user_to])
+        print("Message to encrypt : " + data)
+        encrypted_message = f.encrypt(str.encode(data))
+        print("Message encrypted : ", end='')
+        print(encrypted_message)
+        server_listen_socket.send(encrypted_message)  # Send message
 
         text.configure(state=tk.NORMAL)
         text.insert(tk.INSERT, '[to ' + user_to + ']', 'name')
