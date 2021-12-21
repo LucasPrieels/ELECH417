@@ -8,3 +8,4 @@ CREATE TABLE users(
     last_login TIMESTAMP NOT NULL,
     client_public_key VARCHAR(2048) NOT NULL
 );
+

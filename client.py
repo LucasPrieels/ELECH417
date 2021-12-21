@@ -450,8 +450,7 @@ def refresh(text, history):
     global usr
     text.configure(state=tk.NORMAL)
     print(history)
-
-
+    text.delete('1.0', tk.END)
 
     for message in history:
         from_username = message[0]
@@ -462,16 +461,16 @@ def refresh(text, history):
         else :
             ## we are communicating with the "from"
             key = symm_keys[from_username]
-        
-        print(key)
+
 
 
         content = message[2]
         time = message[3]
 
         f = Fernet(key)
+        print("content : " + content)
         decrypted_message = bytes.decode(f.decrypt(str.encode(content)))
-        
+
 
         text.insert(tk.INSERT, '[' + message[0] + ']', 'name')
         text.insert(tk.INSERT, decrypted_message + "\n", 'message')
