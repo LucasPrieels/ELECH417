@@ -373,7 +373,7 @@ def chat_init_gui():
 
     ##########################################################
 
-    active_users.bind("<Double-1>", callback)   #Get the user we click on
+    active_users.bind("<<ListboxSelect>>", callback)   #Get the user we click on
 
     user_to = sendto_label.cget("text")         #Update the user we want to talk to
 
