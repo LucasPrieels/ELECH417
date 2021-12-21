@@ -78,6 +78,7 @@ def authenticate_nonce(server_main_socket, private_key):
 
 def login_gui():
     global root
+
     root.destroy()
     root = tk.Tk()
 
@@ -106,6 +107,7 @@ def login_gui():
 
     def login(ip):
         global usr
+        global server_main_socket
         global server_listen_socket
 
         usr = user_entry.get()
@@ -154,11 +156,11 @@ def login_gui():
 
 def chat_init_gui():
     global root
-    global usr
     global user_to
-    global server_listen_socket
+
 
     user_to = usr # juste pour tester
+
     root.destroy()
     root = tk.Tk()
     root.title('Chat')
@@ -170,29 +172,38 @@ def chat_init_gui():
     text = scrolledtext.ScrolledText(root, height=17, width=41, font=(font, 10), wrap='word')
     text.place(x=10, y=40)
     text.yview(tk.END)
-    text.configure(state=tk.NORMAL)
-
-    text.insert(tk.INSERT, "J'adore les gros chibre" + '\n')
-    text.insert(tk.INSERT, "J'adore les gros chibre")
-    text.configure(state=tk.DISABLED)
 
     msg_entry = tk.Entry(root, font=(font, 13), width=25)
 
     msg_entry.place(x=10, y=365)
 
     def receive():  # Listen from messages from the server and displays them
-        user_from = bytes.decode(server_main_socket.recv(10))
-        data = bytes.decode(server_main_socket.recv(2048))
-        text.configure(state=tk.NORMAL)
-        text.insert(tk.INSERT, '[' + user_from + ']', 'name')
-        text.insert(tk.INSERT, data + "\n", 'message')
-        text.tag_config('name', foreground="green", font=(font, 14, 'bold'))
-        text.tag_config('message', foreground="green")
-        text.configure(state=tk.DISABLED)
+        while True:
+
+            user_from = bytes.decode(server_main_socket.recv(10))
+            data = bytes.decode(server_main_socket.recv(2048))
+
+
+            text.configure(state=tk.NORMAL)
+            text.insert(tk.INSERT, '[' + user_from + ']', 'name')
+            text.insert(tk.INSERT, data + "\n", 'message')
+            text.tag_config('name', foreground="green", font=(font, 14, 'bold'))
+            text.tag_config('message', foreground="green")
+            text.configure(state=tk.DISABLED)
 
     def send():  # Listen for the client's input and sends it to the server
         data = msg_entry.get()
+        server_listen_socket.send(str.encode(user_to))
+        time.sleep(0.1)
         server_listen_socket.send(str.encode(data))  # Send message
+
+        text.configure(state=tk.NORMAL)
+        text.insert(tk.INSERT, '[to ' + user_to + ']', 'name')
+        text.insert(tk.INSERT, data + "\n", 'message')
+        text.tag_config('name', foreground="blue", font=(font, 14, 'bold'))
+        text.tag_config('message', foreground="blue")
+        text.configure(state=tk.DISABLED)
+
         print("message envoyé")
         msg_entry.delete(0, 'end')
 
@@ -200,7 +211,13 @@ def chat_init_gui():
                            command=send)
     sendbutton.place(x=300, y=365)
 
-    sendto_label = tk.Label(root, font=(font, 13), bg='blue', fg='black', text="Send to " + user_to, width=15)
+    ###à modifier
+
+    receivebutton = tk.Button(root, font=(font, 10), text='Receive', bd=0, bg='blue', fg='black', width=10,
+                           command=receive)
+    receivebutton.place(x=300, y=300)
+
+    sendto_label = tk.Label(root, font=(font, 13), bg='blue', fg='black', text=user_to, width=15)
     sendto_label.place(y=40, x=400)
 
     tk.Label(root, font=(font, 13), bg='Green', fg='black', text='Users', width=10).place(y=200, x=400)
@@ -213,7 +230,10 @@ def chat_init_gui():
     active_users = tk.Listbox(root, height=8, width=20)
     active_users.place(x=400, y=230)
 
-    users = ["Karim", "Mahmoud", "Jean", "Jacques"]
+
+    ########################################################@
+
+    users = ["Karim", "Mahmoud", "Jean", "julien", "nico"]
     i = 0
 
     while i < len(users):
@@ -221,20 +241,26 @@ def chat_init_gui():
         i += 1
 
     def callback(event):
+        global user_to
         selection = event.widget.curselection()
         if selection:
             index = selection[0]
             data = event.widget.get(index)
-            sendto_label.configure(text="Send to " + data)
+            sendto_label.configure(text=data)
+            user_to = sendto_label.cget("text")
         else:
             sendto_label.configure(text="")
+
+    ##########################################################
 
     active_users.bind("<Double-1>", callback)   #Get the user we click on
 
     user_to = sendto_label.cget("text")         #Update the user we want to talk to
 
+    start_new_thread(receive,())
+
     root.mainloop()
-    
+
 def generate_keys(): # Source of this function : https://nitratine.net/blog/post/asymmetric-encryption-and-decryption-in-python/
 
     # Generates the private and public keys
