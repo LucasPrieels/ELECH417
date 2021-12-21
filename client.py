@@ -8,6 +8,7 @@ from cryptography.fernet import Fernet
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives import serialization, hashes
+import datetime
 
 
 font = "Arial Black"
@@ -77,7 +78,8 @@ def init_gui():
     tk.Button(root, text="Register", command=register_gui).grid(row=4, column=2)
 
     root.mainloop()
-    
+
+
 def authenticate_nonce(server_main_socket, private_key):
     nonce = server_main_socket.recv(64) # No need to convert in str
     print("Nonce : ", end='')
@@ -100,7 +102,8 @@ def authenticate_nonce(server_main_socket, private_key):
     a = bytes.decode(server_main_socket.recv(1))
     print(a)
     return a == "1"
-    
+
+
 def init_contacts(usr):
     if not os.path.exists("symmetric_keys_" + usr + ".txt"): # If the file doesn't exist yet, create it
         with open("symmetric_keys_" + usr + ".txt", 'w') as f:
@@ -109,6 +112,7 @@ def init_contacts(usr):
         for line in f.readlines():
             contact, symm_key = line.split(' ')
             symm_keys[contact] = symm_key.strip() # Removes newline
+
 
 def login_gui():
     global root
@@ -205,6 +209,7 @@ def get_history_from_server(username1, username2) :
 
     return 
 
+
 def chat_init_gui():
     global root
     global usr
@@ -250,9 +255,17 @@ def chat_init_gui():
                 server_main_socket.send(encrypted_symm_key)
             if sender == "2HISTORY" :
                 print("Received history from server : ")
-                sender = bytes.decode(server_main_socket.recv(2048))
+                history = bytes.decode(server_main_socket.recv(2048))
                 print(sender)
                 #history_cleaned = (str(sender)[1:-1].split(","))
+
+
+                #history = [('nico', 'julien', 'Salut', datetime.datetime(2021, 12, 21, 13, 55, 37, 938115)), ('nico', 'julien', 'Salut jai faim', datetime.datetime(2021, 12, 21, 13, 59, 8, 517617)), ('julien', 'nico', 'moi aussi, fais a manger stp', datetime.datetime(2021, 12, 21, 13, 59, 36, 211957)), ('nico', 'julien', 'julien', datetime.datetime(2021, 12, 21, 13, 59, 54, 481910)), ('nico', 'julien', 'tg', datetime.datetime(2021, 12, 21, 13, 59, 54, 582114)), ('julien', 'nico', 'nico', datetime.datetime(2021, 12, 21, 13, 59, 57, 400669)), ('julien', 'nico', 'toi tg', datetime.datetime(2021, 12, 21, 13, 59, 57, 500964)), ('julien', 'nico', 'bonjour', datetime.datetime(2021, 12, 21, 14, 6, 14, 709143)), ('nico', 'julien', 'bonjour', datetime.datetime(2021, 12, 21, 14, 25, 38, 796402)), ('nico', 'julien', 'Hello!', datetime.datetime(2021, 12, 21, 14, 47, 54, 764292)), ('julien', 'nico', 'SALAUU', datetime.datetime(2021, 12, 21, 14, 48, 16, 8938))]
+                history = [('nico', 'julien', 'gAAAAABhwg3LEDI78EnAJ7ERU4Ym0uc-ha0yHdg5fhrTcCE91gnCg8eg3cRQvmbZsRLsol1me_lzBVgpJoo0mcCd9sqACK8u8w==', '12-21-2021 18:23:59'), ('julien', 'nico', 'gAAAAABhwhGzDk2Cc7nJo_5afpQgizNKTEdlSfchf0ffYmYQCVhmtowcfF7tiGNsacRYo_HQzSixIN79t0XtVHr0zmhBzFMIgQ==', '12-21-2021 18:41:05'), ('julien', 'nico', 'gAAAAABhwhG6ody8AKy2znfLUwNJtaSKMLYMTLmGkkGY75UDQT4ek243kXC_IpXbZ5ksF5lgNH5l2XYAgMG0i9xpMi3-uQ2tQraOGSOwVHZl500aBLydLFU=', '12-21-2021 18:41:14'), ('julien', 'nico', 'gAAAAABhwhG8JOk2e1cxNm3yOr9JlGwFF7nGi00ahh_9VSA1-iOd8aMZAnmoY9pBkFuP-G8r32f1pinhP7bpxcKQU2xgivhd-g==', '12-21-2021 18:41:16'), ('julien', 'nico', 'gAAAAABhwhHFMbs6cw9wDC_BVJwxBQ7R4BWqQFwVkgZkPkulu_ug_SMOKez3y12eFOraldmv1GZNdigocFIQuTMluBXF2gVxTEYExIhlLn4uzXvwJyFUi2mCG7uZo4X1OGxjkoWUSukpxaLamSPm3bMgEIW8PrRwIQ==', '12-21-2021 18:41:25')]
+
+                refresh(text, history)
+
+
 
             else :
                 data = server_main_socket.recv(2048)
@@ -269,18 +282,6 @@ def chat_init_gui():
                 text.tag_config('name', foreground="green", font=(font, 14, 'bold'))
                 text.tag_config('message', foreground="green")
                 text.configure(state=tk.DISABLED)
-
-    def refresh():
-        
-        print(user_to)  
-        print(usr)
-        
-
-        get_history_from_server(username1=usr, username2=user_to)
-
-        text.configure(state=tk.NORMAL)
-        text.delete("1.0","end")
-        text.configure(state=tk.DISABLED)
 
 
     def send():  # Listen for the client's input and sends it to the server
@@ -353,7 +354,7 @@ def chat_init_gui():
                 private_key, public_key = get_keys()
                 symm_key = get_symmetric_key_from_server(server_main_socket, public_key)
                 
-                if not os.path.exists("symmetric_keys_" + usr + ".txt"): # If the file doesn't exist yet, create it
+                if not os.path.exists("symmetric_keys_" + usr + ".txt"): # If the file doesn't exist yet, create itr
                     with open("symmetric_keys_" + usr + ".txt", 'w') as f:
                         f.write("")
             
@@ -364,8 +365,9 @@ def chat_init_gui():
             
             sendto_label.configure(text=data)
             user_to = sendto_label.cget("text")
+            get_history_from_server(username1=usr, username2=user_to)
 
-            refresh() #refresh the chat
+
         else:
             sendto_label.configure(text="")
 
@@ -406,7 +408,8 @@ def generate_keys(): # Source of this function : https://nitratine.net/blog/post
     )
     with open('public_key.pem', 'wb') as f:
         f.write(pem)
-        
+
+
 def get_keys(): # Source of this function : https://nitratine.net/blog/post/asymmetric-encryption-and-decryption-in-python/
     if not os.path.exists("private_key.pem") or not os.path.exists("public_key.pem"):
         print("Asymetric keys don't exist yet, creating them...")
@@ -426,6 +429,7 @@ def get_keys(): # Source of this function : https://nitratine.net/blog/post/asym
         )
         
     return private_key, public_key
+
     
 def read_keys(): # Source of this function : https://nitratine.net/blog/post/asymmetric-encryption-and-decryption-in-python/
     print("Read keys : " + str(os.path.exists("private_key.pem")))
@@ -440,7 +444,21 @@ def read_keys(): # Source of this function : https://nitratine.net/blog/post/asy
     public_key = key_file.read()
         
     return private_key, public_key
-    
+
+
+def refresh(text, history):
+    text.configure(state=tk.NORMAL)
+    print(history)
+
+
+    for message in history:
+        text.insert(tk.INSERT, '[' + message[0] + ']', 'name')
+        text.insert(tk.INSERT, message[2] + "\n", 'message')
+        text.tag_config('name', foreground="green", font=(font, 14, 'bold'))
+        text.tag_config('message', foreground="green")
+
+    text.configure(state=tk.DISABLED)
+
 def get_symmetric_key_from_server(server_main_socket, public_key):
     encrypted_symm_key = server_main_socket.recv(1024) # The key can stay in bytes, no need to convert in str
     
@@ -460,6 +478,7 @@ def get_symmetric_key_from_server(server_main_socket, public_key):
     print("Decrypted symmetric key : " + symm_key)
     
     return symm_key
+
 
 def register_gui():
     global root
