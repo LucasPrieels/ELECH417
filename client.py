@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+from contextlib import AbstractContextManager
 import socket, time, os, hashlib
 from _thread import *
 import tkinter as tk
@@ -224,6 +225,8 @@ def chat_init_gui():
     root.configure(bg='white')
     root.resizable(False, False)
 
+
+    # Chat window
     tk.Label(root, text='Chat', bg='white', font=(font, 13), fg='black', width=50, height=1).place(x=-200, y=20)
     text = scrolledtext.ScrolledText(root, height=17, width=41, font=(font, 10), wrap='word')
     text.place(x=10, y=40)
@@ -234,6 +237,9 @@ def chat_init_gui():
     msg_entry = tk.Entry(root, font=(font, 13), width=25)
 
     msg_entry.place(x=10, y=365)
+
+
+    
 
     def receive():  # Listen from messages from the server and displays them
         while True:
@@ -254,18 +260,22 @@ def chat_init_gui():
                 print("Encrypted symmetric key : ", end='')
                 print(encrypted_symm_key)
                 server_main_socket.send(encrypted_symm_key)
-            if sender == "2HISTORY" :
+            elif sender == "2HISTORY" :
                 print("Received history from server : ")
                 history = bytes.decode(server_main_socket.recv(2048))
                 
                 # Translates "history" string into a list, and the stringified tuples into tuples
                 history_cleaned = ast.literal_eval(history)
-                
-
-
                 refresh(text, history_cleaned)
+            
+            elif sender == "3UPDATE" :
+                print("There is an update in the list of the logged-in users.")
+                logged_in_users = bytes.decode(server_main_socket.recv(2048))
+                logged_in_users_list = ast.literal_eval(logged_in_users)
+                
+                print(logged_in_users_list)
 
-
+                refresh_active_users(active_users, logged_in_users_list)
 
             else :
                 data = server_main_socket.recv(2048)
@@ -286,30 +296,37 @@ def chat_init_gui():
 
     def send():  # Listen for the client's input and sends it to the server
         data = msg_entry.get()
-        server_listen_socket.send(str.encode(user_to))
-        time.sleep(0.1) # to avoid merge of user and data
-        f = Fernet(symm_keys[user_to])
-        print("Symmetric key for user " + user_to + " : " + symm_keys[user_to])
-        print("Message to encrypt : " + data)
-        encrypted_message = f.encrypt(str.encode(data))
-        print("Message encrypted : ", end='')
-        print(encrypted_message)
-        server_listen_socket.send(encrypted_message)  # Send message
+        if(data != "") :
+            server_listen_socket.send(str.encode(user_to))
+            time.sleep(0.1) # to avoid merge of user and data
+            f = Fernet(symm_keys[user_to])
+            print("Symmetric key for user " + user_to + " : " + symm_keys[user_to])
+            print("Message to encrypt : " + data)
+            encrypted_message = f.encrypt(str.encode(data))
+            print("Message encrypted : ", end='')
+            print(encrypted_message)
+            server_listen_socket.send(encrypted_message)  # Send message
 
-        text.configure(state=tk.NORMAL)
-        text.insert(tk.INSERT, '[to ' + user_to + ']', 'name')
-        text.insert(tk.INSERT, data + "\n", 'message')
-        text.tag_config('name', foreground="green", font=(font, 14, 'bold'))
-        text.tag_config('message', foreground="green")
-        text.configure(state=tk.DISABLED)
+            text.configure(state=tk.NORMAL)
+            text.insert(tk.INSERT, '[to ' + user_to + ']', 'name')
+            text.insert(tk.INSERT, data + "\n", 'message')
+            text.tag_config('name', foreground="green", font=(font, 14, 'bold'))
+            text.tag_config('message', foreground="green")
+            text.configure(state=tk.DISABLED)
 
-        print("message envoyé")
-        msg_entry.delete(0, 'end')
+            print("message envoyé")
+            msg_entry.delete(0, 'end')
+        else :
+            print("Attempt to send empty messages")
 
+    
+    # Configuration of the send button
     sendbutton = tk.Button(root, font=(font, 10), text='Send', bd=0, bg='blue', fg='black', width=10,
                            command=send)
     sendbutton.place(x=300, y=365)
 
+
+    # Choice box containing active users
     sendto_label = tk.Label(root, font=(font, 13), bg='blue', fg='black', text=user_to, width=15)
     sendto_label.place(y=40, x=400)
 
@@ -322,15 +339,9 @@ def chat_init_gui():
 
     active_users = tk.Listbox(root, height=8, width=20)
     active_users.place(x=400, y=230)
-
     ########################################################@
 
-    users = ["Karim", "Mahmoud", "Jean", "julien", "nico", "sami"]
-    i = 0
 
-    while i < len(users):
-        active_users.insert(i + 1, users[i])
-        i += 1
 
     def callback(event):
         global user_to
@@ -445,6 +456,19 @@ def read_keys(): # Source of this function : https://nitratine.net/blog/post/asy
         
     return private_key, public_key
 
+def refresh_active_users(active_users, users_list) :
+
+    
+    active_users.delete('0', tk.END)
+
+    
+    i = 0
+    while i < len(users_list):
+        active_users.insert(i + 1, users_list[i])
+        i += 1
+    
+    return 
+
 
 def refresh(text, history):
     global usr
@@ -471,8 +495,7 @@ def refresh(text, history):
         print("content : " + content)
         decrypted_message = bytes.decode(f.decrypt(str.encode(content)))
 
-
-        text.insert(tk.INSERT, '[' + message[0] + ']', 'name')
+        text.insert(tk.INSERT, '[from : ' + from_username + ']', 'name')
         text.insert(tk.INSERT, decrypted_message + "\n", 'message')
         text.tag_config('name', foreground="green", font=(font, 14, 'bold'))
         text.tag_config('message', foreground="green")

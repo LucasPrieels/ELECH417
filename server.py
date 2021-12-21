@@ -163,6 +163,7 @@ def get_salt_from_db(username):
         return (str.encode("a")).hex()
 
 def login(main_connection):
+    global clients 
     credentials = get_users_from_db()
     
     usr = bytes.decode(client_connection.recv(1024))
@@ -181,18 +182,18 @@ def login(main_connection):
         print("Login unsucessful")
         return -1, -1
     else:
+        
+        # Login successful
         update_last_login(usr)
 
+        # Send to client the information that login is successful
         main_connection.send(str.encode("2"))
+
         
         nonce = secrets.token_urlsafe(32) # Generates a random nonce
-        print("Nonce : ", end='')
-        print(nonce)
         main_connection.send(str.encode(nonce)) # And sends it to the client
         
         encrypted_private_key_nonce = client_connection.recv(1024)
-        print("Encrypted private key nonce : ", end='')
-        print(encrypted_private_key_nonce)
         
         public_key = transform_string_to_key(get_client_public_key(usr))
         try: # Checks encrypted_private_key_nonce is the signature of message nonce. If not, raises an invalid signature exception
@@ -238,7 +239,6 @@ def display_history_of(id1, id2) :
         ;
     """.format(id1, id2, id2, id1)
 
-    print(query)
 
     cur.execute(query)
     results = cur.fetchall()
@@ -324,9 +324,30 @@ while True:
         if usr == -1:
             continue # Login unsucessful
         else:
+            # Login successful
             client_listen_connection, address = socket_client.accept() # From now on, listen on connection client_listen_connection and send on client_connection. Address is the same as before since it's the same client
             clients[usr] = (client_connection, client_listen_connection) # Add the user to the list of connected users
             print(clients)
+            # Send to all clients the list of connected clients
+
+            # Get list of all usernames : clients.keys()
+
+
+            for username, values in clients.items() :
+                usernames_copy = list(clients.keys()).copy()
+                usernames_copy.remove(username)
+
+                client_connection = values[0]
+                client_listen_connection = values[1]
+                
+                time.sleep(0.2)
+                # Informs the client socket that an update is coming
+                client_connection.send(str.encode("3UPDATE"))
+                time.sleep(1)
+                # Send to each user a list of all logged-in users BUT the concerned user itself
+                client_connection.send(str.encode(str(usernames_copy)))
+                time.sleep(0.2)
+
             start_new_thread(server_listener, (usr,))
     elif query == "1":
         usr = signup(client_connection)
