@@ -158,8 +158,7 @@ def chat_init_gui():
     global root
     global user_to
 
-
-    user_to = usr # juste pour tester
+    user_to = usr
 
     root.destroy()
     root = tk.Tk()
@@ -191,17 +190,22 @@ def chat_init_gui():
             text.tag_config('message', foreground="green")
             text.configure(state=tk.DISABLED)
 
+    def refresh():
+        text.configure(state=tk.NORMAL)
+        text.delete("1.0","end")
+        text.configure(state=tk.DISABLED)
+
     def send():  # Listen for the client's input and sends it to the server
         data = msg_entry.get()
         server_listen_socket.send(str.encode(user_to))
-        time.sleep(0.1)
+        time.sleep(0.1) # to avoid merge of user and data
         server_listen_socket.send(str.encode(data))  # Send message
 
         text.configure(state=tk.NORMAL)
         text.insert(tk.INSERT, '[to ' + user_to + ']', 'name')
         text.insert(tk.INSERT, data + "\n", 'message')
-        text.tag_config('name', foreground="blue", font=(font, 14, 'bold'))
-        text.tag_config('message', foreground="blue")
+        text.tag_config('name', foreground="green", font=(font, 14, 'bold'))
+        text.tag_config('message', foreground="green")
         text.configure(state=tk.DISABLED)
 
         print("message envoyé")
@@ -211,11 +215,9 @@ def chat_init_gui():
                            command=send)
     sendbutton.place(x=300, y=365)
 
-    ###à modifier
-
-    receivebutton = tk.Button(root, font=(font, 10), text='Receive', bd=0, bg='blue', fg='black', width=10,
-                           command=receive)
-    receivebutton.place(x=300, y=300)
+    refreshbutton = tk.Button(root, font=(font, 10), text='refresh', bd=0, bg='blue', fg='black', width=10,
+                           command=refresh)
+    refreshbutton.place(x=300, y=330)
 
     sendto_label = tk.Label(root, font=(font, 13), bg='blue', fg='black', text=user_to, width=15)
     sendto_label.place(y=40, x=400)
@@ -248,6 +250,8 @@ def chat_init_gui():
             data = event.widget.get(index)
             sendto_label.configure(text=data)
             user_to = sendto_label.cget("text")
+
+            refresh() #refresh the chat
         else:
             sendto_label.configure(text="")
 
@@ -260,6 +264,7 @@ def chat_init_gui():
     start_new_thread(receive,())
 
     root.mainloop()
+
 
 def generate_keys(): # Source of this function : https://nitratine.net/blog/post/asymmetric-encryption-and-decryption-in-python/
 
