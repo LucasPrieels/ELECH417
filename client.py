@@ -17,6 +17,23 @@ font = "Arial Black"
 disconnection = False # It is put to True when the user wants to be disconnected
 symm_keys = {}
 
+def center():
+    global root
+    # Gets the requested values of the height and widht.
+    windowWidth = root.winfo_reqwidth()
+    windowHeight = root.winfo_reqheight()
+    print("Width", windowWidth, "Height", windowHeight)
+    print(root.winfo_screenwidth())
+
+    # Gets both half the screen width/height and window width/height
+    positionRight = int(root.winfo_screenwidth() / 2 - windowWidth / 2)
+    positionDown = int(root.winfo_screenheight() / 2 - windowHeight / 2)
+
+    # Positions the window in the center of the page.
+    root.geometry("+{}+{}".format(positionRight, positionDown))
+
+
+
 def connect_to_server(ip, remote_port):
     s = socket.socket() # Remote socket
     host = socket.gethostname() # Remote address (here same as local since local tests)
@@ -70,18 +87,33 @@ def generate_symmetric_key(usr, remote_usr, public_key_string):
 
 #GUI
 
+
 def init_gui():
     global root
     root = tk.Tk()
-    root.geometry('400x150')
+    root.geometry('600x400')
+    root.resizable(False, False)
     root.title('login signup')
 
     pygame.init()
     pygame.mixer.music.load('audio/login.mp3')
-    pygame.mixer.music.play(-1)
 
-    tk.Button(root, text="Login", command=login_gui).grid(row=4, column=0)
-    tk.Button(root, text="Register", command=register_gui).grid(row=4, column=2)
+
+
+
+    bg = tk.PhotoImage(file="images/home.png")
+    bg = bg.zoom(1)  # with 250, I ended up running out of memory
+    bg = bg.subsample(6)
+    label1 = tk.Label(root, image=bg)
+    label1.place(x=0, y=0)
+
+    buttonlogin = tk.Button(root, text="Login", command=login_gui)
+    buttonregister = tk.Button(root, text="Register", command=register_gui)
+    buttonmusic = tk.Button(root, text="music", command=lambda:pygame.mixer.music.play(-1))
+    buttonlogin.place(x=310, y=280)
+    buttonregister.place(x=300, y=200)
+    buttonmusic.place(x=110,y=120)
+
 
     root.mainloop()
 
@@ -125,6 +157,7 @@ def login_gui():
 
     root.destroy()
     root = tk.Tk()
+    center()
 
     root.title('Login')
     root.geometry('300x300+220+170')
@@ -228,7 +261,6 @@ def chat_init_gui():
     root = tk.Tk()
     root.title('Chat')
     root.geometry('600x400')
-    root.configure(bg='white')
     root.resizable(False, False)
 
     tk.Label(root, text='Chat', bg='white', font=(font, 13), fg='black', width=50, height=1).place(x=-200, y=20)
@@ -517,10 +549,14 @@ def register_gui():
     root.destroy()
     root = tk.Tk()
 
+
+
     root.title('Register')
     root.geometry('300x300+220+170')
     root.configure(bg='white')
     root.resizable(False, False)
+
+    center()
 
     log_label = tk.Label(root, text='Register', width=20, height=1, font=(font, 20, 'bold'))
     log_label.pack()
