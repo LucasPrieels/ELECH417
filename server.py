@@ -214,7 +214,38 @@ def login(main_connection):
             print("Login successful")
             return usr, new_socket_client(client_connection)
         
+
+def get_id_from_username(username):
+    global db_connection
+    cur = db_connection.cursor()
+
+    cur.execute("""
+    SELECT user_id FROM users WHERE username='{}'
+    """.format(username))
+    return cur.fetchone()[0]
+
+def display_history_of(id1, id2) :
+    global db_connection
+    cur = db_connection.cursor()
+    query = """
+    SELECT u1.username as from , u2.username as to, m.content, m.time
+    FROM messages m, users u1 , users u2
+    WHERE ((m.from_id = {} AND m.to_id = {})
+        OR (m.from_id = {} AND m.to_id = {}))
+        AND (m.from_id = u1.user_id AND m.to_id = u2.user_id)
+         ;
+    """.format(id1, id2, id2, id1)
+
+    print(query)
+
+    cur.execute(query)
+    results = cur.fetchall()
+    cur.close()
+    
+    return results
+
 def server_listener(usr): # Listen to messages arriving from a client and displays them
+
     client_connection, client_listen_connection = clients[usr] # Gets the sending and listening connections for this user
     while True:
         recipient = bytes.decode(client_listen_connection.recv(10))
@@ -240,6 +271,20 @@ def server_listener(usr): # Listen to messages arriving from a client and displa
             print(encrypted_symm_key)
             print("Forwarding the symmetric key to " + usr)
             client_connection.send(encrypted_symm_key) # Retransmit the reply of the recipient to the client (the encrypted symmetric key or an error message)
+        
+        elif recipient == "2HISTORY" :
+            print("Server has been asked to show history")
+            # Collect usernames from the client
+            username1 = bytes.decode(client_listen_connection.recv(64))
+            username2 = bytes.decode(client_listen_connection.recv(64)) 
+
+            id1, id2 = get_id_from_username(username1), get_id_from_username(username2)
+
+            history = display_history_of(id1, id2)
+
+            ## A toi de jouer nico
+            print(history)
+
         elif recipient not in clients:
             client_listen_connection.send(str.encode("0")) # The user which need to be contacted doesn't exist or is not connected
         else:
@@ -249,9 +294,18 @@ def server_listener(usr): # Listen to messages arriving from a client and displa
             print("Forwarding a message from user " + usr + " to " + recipient + " : ", end='')
             
             data = bytes.decode(client_listen_connection.recv(2048))
+
+            # Insert message in DB
+            cur = db_connection.cursor()
+            cur.execute("""
+            INSERT INTO messages(from_id, to_id, content, time)
+            VALUES({}, {}, '{}', NOW())
+            """.format(get_id_from_username(usr), get_id_from_username(recipient), data))
+            cur.close()
+            db_connection.commit()
+
             print(data)
             recipient_connection.send(str.encode(data))
-
 main_socket = create_new_socket(10000) # Main socket, used by the server to send data and to listen to new connections. Port number is 10 000 by definition
 db_connection = connect()
 

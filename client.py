@@ -9,6 +9,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives import serialization, hashes
 
+
 font = "Arial Black"
 disconnection = False # It is put to True when the user wants to be disconnected
 symm_keys = {}
@@ -132,6 +133,7 @@ def init_contacts(usr):
 
 def login_gui():
     global root
+
     root.destroy()
     root = tk.Tk()
 
@@ -160,6 +162,7 @@ def login_gui():
 
     def login(ip):
         global usr
+        global server_main_socket
         global server_listen_socket
         global server_main_socket
 
@@ -211,11 +214,24 @@ def login_gui():
     root.mainloop()
 
 
+def get_history_from_server(username1, username2) :
+
+    # Ask server to show history
+    server_listen_socket.send(str.encode("2HISTORY"))
+    time.sleep(0.1)
+    # Sends the concerned usernames
+    server_listen_socket.send(str.encode(username1))
+    time.sleep(0.1)
+    server_listen_socket.send(str.encode(username2))
+
+    return 
+
 def chat_init_gui():
     global root
     global usr
     global user_to
-    user_to = usr # juste pour tester
+    
+    user_to = usr
     root.destroy()
     root = tk.Tk()
     root.title('Chat')
@@ -235,20 +251,47 @@ def chat_init_gui():
     msg_entry.place(x=10, y=365)
 
     def receive():  # Listen from messages from the server and displays them
-        user_from = bytes.decode(server_main_socket.recv(10))
-        data = bytes.decode(server_main_socket.recv(2048))
+        while True:
+
+            user_from = bytes.decode(server_main_socket.recv(10))
+
+            
+
+            data = bytes.decode(server_main_socket.recv(2048))
+
+
+            text.configure(state=tk.NORMAL)
+            text.insert(tk.INSERT, '[' + user_from + ']', 'name')
+            text.insert(tk.INSERT, data + "\n", 'message')
+            text.tag_config('name', foreground="green", font=(font, 14, 'bold'))
+            text.tag_config('message', foreground="green")
+            text.configure(state=tk.DISABLED)
+
+    def refresh():
+        
+        print(user_to)  
+        print(usr)
+        
+
+        get_history_from_server(username1=usr, username2=user_to)
+
         text.configure(state=tk.NORMAL)
-        text.insert(tk.INSERT, '[' + user_from + ']', 'name')
-        text.insert(tk.INSERT, data + "\n", 'message')
-        text.tag_config('name', foreground="green", font=(font, 14, 'bold'))
-        text.tag_config('message', foreground="green")
+        text.delete("1.0","end")
         text.configure(state=tk.DISABLED)
 
     def send():  # Listen for the client's input and sends it to the server
         data = msg_entry.get()
         server_listen_socket.send(str.encode(user_to))
-        time.sleep(0.1)
+        time.sleep(0.1) # to avoid merge of user and data
         server_listen_socket.send(str.encode(data))  # Send message
+
+        text.configure(state=tk.NORMAL)
+        text.insert(tk.INSERT, '[to ' + user_to + ']', 'name')
+        text.insert(tk.INSERT, data + "\n", 'message')
+        text.tag_config('name', foreground="green", font=(font, 14, 'bold'))
+        text.tag_config('message', foreground="green")
+        text.configure(state=tk.DISABLED)
+
         print("message envoyé")
         msg_entry.delete(0, 'end')
 
@@ -269,13 +312,17 @@ def chat_init_gui():
     active_users = tk.Listbox(root, height=8, width=20)
     active_users.place(x=400, y=230)
 
-    users = ["a1", "Mahmoud", "Jean", "Jacques"]
+    ########################################################@
+
+    users = ["Karim", "Mahmoud", "Jean", "julien", "nico"]
     i = 0
+
     while i < len(users):
         active_users.insert(i + 1, users[i])
         i += 1
 
     def callback(event):
+        global user_to
         selection = event.widget.curselection()
         if selection:
             index = selection[0]
@@ -306,14 +353,23 @@ def chat_init_gui():
                     symm_keys[data] = symm_key
             
             sendto_label.configure(text=data)
+            user_to = sendto_label.cget("text")
+
+            refresh() #refresh the chat
         else:
             sendto_label.configure(text="")
 
+    ##########################################################
+
     active_users.bind("<Double-1>", callback)   #Get the user we click on
+
     user_to = sendto_label.cget("text")         #Update the user we want to talk to
 
+    start_new_thread(receive,())
+
     root.mainloop()
-    
+
+
 def generate_keys(): # Source of this function : https://nitratine.net/blog/post/asymmetric-encryption-and-decryption-in-python/
 
     # Generates the private and public keys
@@ -459,8 +515,6 @@ def register_gui():
 
             elif ans == "1":
                 resp.configure(text='Signup successful !',  wraplength=200, fg='green')
-                time.sleep(3)
-                chat_init_gui()
             else:
                 raise Exception("Unexpected answer")
 
