@@ -9,6 +9,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives import serialization, hashes
 import datetime
+import pygame
 import ast
 
 
@@ -74,6 +75,10 @@ def init_gui():
     root = tk.Tk()
     root.geometry('400x150')
     root.title('login signup')
+
+    pygame.init()
+    pygame.mixer.music.load('audio/login.mp3')
+    pygame.mixer.music.play(-1)
 
     tk.Button(root, text="Login", command=login_gui).grid(row=4, column=0)
     tk.Button(root, text="Register", command=register_gui).grid(row=4, column=2)
@@ -215,6 +220,8 @@ def chat_init_gui():
     global root
     global usr
     global user_to
+
+    pygame.mixer.music.stop()
     
     user_to = usr
     root.destroy()
@@ -254,6 +261,9 @@ def chat_init_gui():
                 print("Encrypted symmetric key : ", end='')
                 print(encrypted_symm_key)
                 server_main_socket.send(encrypted_symm_key)
+
+
+
             if sender == "2HISTORY" :
                 print("Received history from server : ")
                 history = bytes.decode(server_main_socket.recv(2048))
@@ -283,6 +293,8 @@ def chat_init_gui():
                 text.tag_config('message', foreground="green")
                 text.configure(state=tk.DISABLED)
 
+                receive_sound = pygame.mixer.Sound("audio/receive.wav")
+                pygame.mixer.Sound.play(receive_sound)
 
     def send():  # Listen for the client's input and sends it to the server
         data = msg_entry.get()
