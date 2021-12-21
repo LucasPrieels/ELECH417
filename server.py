@@ -228,7 +228,7 @@ def display_history_of(id1, id2) :
     global db_connection
     cur = db_connection.cursor()
     query = """
-    SELECT u1.username as from , u2.username as to, m.content, m.time
+    SELECT u1.username as from , u2.username as to, m.content, to_char(m.time, 'MM-DD-YYYY HH24:MI:SS')
     FROM messages m, users u1 , users u2
     WHERE ((m.from_id = {} AND m.to_id = {})
         OR (m.from_id = {} AND m.to_id = {}))

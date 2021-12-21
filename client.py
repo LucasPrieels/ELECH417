@@ -9,6 +9,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives import serialization, hashes
 import datetime
+import ast
 
 
 font = "Arial Black"
@@ -256,14 +257,14 @@ def chat_init_gui():
             if sender == "2HISTORY" :
                 print("Received history from server : ")
                 history = bytes.decode(server_main_socket.recv(2048))
-                print(sender)
-                #history_cleaned = (str(sender)[1:-1].split(","))
+                
+                # Translates "history" string into a list, and the stringified tuples into tuples
+                history_cleaned = ast.literal_eval(history)
+                
+                # Check if user has key with server
+                print("KEY !!! " + symm_keys[sender])
 
-
-                #history = [('nico', 'julien', 'Salut', datetime.datetime(2021, 12, 21, 13, 55, 37, 938115)), ('nico', 'julien', 'Salut jai faim', datetime.datetime(2021, 12, 21, 13, 59, 8, 517617)), ('julien', 'nico', 'moi aussi, fais a manger stp', datetime.datetime(2021, 12, 21, 13, 59, 36, 211957)), ('nico', 'julien', 'julien', datetime.datetime(2021, 12, 21, 13, 59, 54, 481910)), ('nico', 'julien', 'tg', datetime.datetime(2021, 12, 21, 13, 59, 54, 582114)), ('julien', 'nico', 'nico', datetime.datetime(2021, 12, 21, 13, 59, 57, 400669)), ('julien', 'nico', 'toi tg', datetime.datetime(2021, 12, 21, 13, 59, 57, 500964)), ('julien', 'nico', 'bonjour', datetime.datetime(2021, 12, 21, 14, 6, 14, 709143)), ('nico', 'julien', 'bonjour', datetime.datetime(2021, 12, 21, 14, 25, 38, 796402)), ('nico', 'julien', 'Hello!', datetime.datetime(2021, 12, 21, 14, 47, 54, 764292)), ('julien', 'nico', 'SALAUU', datetime.datetime(2021, 12, 21, 14, 48, 16, 8938))]
-                history = [('nico', 'julien', 'gAAAAABhwg3LEDI78EnAJ7ERU4Ym0uc-ha0yHdg5fhrTcCE91gnCg8eg3cRQvmbZsRLsol1me_lzBVgpJoo0mcCd9sqACK8u8w==', '12-21-2021 18:23:59'), ('julien', 'nico', 'gAAAAABhwhGzDk2Cc7nJo_5afpQgizNKTEdlSfchf0ffYmYQCVhmtowcfF7tiGNsacRYo_HQzSixIN79t0XtVHr0zmhBzFMIgQ==', '12-21-2021 18:41:05'), ('julien', 'nico', 'gAAAAABhwhG6ody8AKy2znfLUwNJtaSKMLYMTLmGkkGY75UDQT4ek243kXC_IpXbZ5ksF5lgNH5l2XYAgMG0i9xpMi3-uQ2tQraOGSOwVHZl500aBLydLFU=', '12-21-2021 18:41:14'), ('julien', 'nico', 'gAAAAABhwhG8JOk2e1cxNm3yOr9JlGwFF7nGi00ahh_9VSA1-iOd8aMZAnmoY9pBkFuP-G8r32f1pinhP7bpxcKQU2xgivhd-g==', '12-21-2021 18:41:16'), ('julien', 'nico', 'gAAAAABhwhHFMbs6cw9wDC_BVJwxBQ7R4BWqQFwVkgZkPkulu_ug_SMOKez3y12eFOraldmv1GZNdigocFIQuTMluBXF2gVxTEYExIhlLn4uzXvwJyFUi2mCG7uZo4X1OGxjkoWUSukpxaLamSPm3bMgEIW8PrRwIQ==', '12-21-2021 18:41:25')]
-
-                refresh(text, history)
+                refresh(text, history_cleaned)
 
 
 
