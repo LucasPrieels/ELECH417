@@ -87,6 +87,14 @@ def generate_symmetric_key(usr, remote_usr, public_key_string):
 
 #GUI
 
+def mute_unmute():
+    if pygame.mixer.music.get_volume() > 0:
+        pygame.mixer.music.set_volume(0)
+    else:
+        pygame.mixer.music.set_volume(1)
+
+
+
 
 def init_gui():
     global root
@@ -97,6 +105,7 @@ def init_gui():
 
     pygame.init()
     pygame.mixer.music.load('audio/login.mp3')
+    pygame.mixer.music.play(-1)
 
 
 
@@ -109,7 +118,8 @@ def init_gui():
 
     buttonlogin = tk.Button(root, text="Login", command=login_gui)
     buttonregister = tk.Button(root, text="Register", command=register_gui)
-    buttonmusic = tk.Button(root, text="music", command=lambda:pygame.mixer.music.play(-1))
+    buttonmusic = tk.Button(root, text="music", command=mute_unmute)
+
     buttonlogin.place(x=310, y=280)
     buttonregister.place(x=300, y=200)
     buttonmusic.place(x=110,y=120)
