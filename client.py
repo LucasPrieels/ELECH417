@@ -261,8 +261,7 @@ def chat_init_gui():
                 # Translates "history" string into a list, and the stringified tuples into tuples
                 history_cleaned = ast.literal_eval(history)
                 
-                # Check if user has key with server
-                print("KEY !!! " + symm_keys[sender])
+
 
                 refresh(text, history_cleaned)
 
@@ -448,13 +447,34 @@ def read_keys(): # Source of this function : https://nitratine.net/blog/post/asy
 
 
 def refresh(text, history):
+    global usr
     text.configure(state=tk.NORMAL)
     print(history)
 
 
+
     for message in history:
+        from_username = message[0]
+        to_username = message[1]
+        if(usr == from_username) :
+            ## we are communicating with the "to"
+            key = symm_keys[to_username]
+        else :
+            ## we are communicating with the "from"
+            key = symm_keys[from_username]
+        
+        print(key)
+
+
+        content = message[2]
+        time = message[3]
+
+        f = Fernet(key)
+        decrypted_message = bytes.decode(f.decrypt(str.encode(content)))
+        
+
         text.insert(tk.INSERT, '[' + message[0] + ']', 'name')
-        text.insert(tk.INSERT, message[2] + "\n", 'message')
+        text.insert(tk.INSERT, decrypted_message + "\n", 'message')
         text.tag_config('name', foreground="green", font=(font, 14, 'bold'))
         text.tag_config('message', foreground="green")
 
