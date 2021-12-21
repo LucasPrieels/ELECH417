@@ -230,6 +230,16 @@ def login(main_connection):
             print("Login successful")
             return usr, new_socket_client(client_connection)
         
+
+def get_id_from_username(username):
+    global db_connection
+    cur = db_connection.cursor()
+
+    cur.execute("""
+    SELECT user_id FROM users WHERE username='{}'
+    """.format(username))
+    return cur.fetchone()[0]
+
 def server_listener(usr): # Listen to messages arriving from a client and displays them
     client_connection, client_listen_connection = clients[usr] # Gets the sending and listening connections for this user
     while True:
@@ -248,6 +258,17 @@ def server_listener(usr): # Listen to messages arriving from a client and displa
             while True:
                 data = bytes.decode(client_listen_connection.recv(2048))
                 print("From user " + usr + " : " + data)
+
+                # Insert message in DB
+                cur = db_connection.cursor()
+                cur.execute("""
+                INSERT INTO messages(from_id, to_id, content, time)
+                VALUES({}, {}, '{}', NOW())
+                """.format(get_id_from_username(usr), get_id_from_username(recipient), data))
+                cur.close()
+                db_connection.commit()
+
+
                 if data == "" or data == ".": # Stop communication with this recipient
                     print("Change of conversation")
                     break
