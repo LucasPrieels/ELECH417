@@ -184,7 +184,7 @@ def get_keys(): # Source of this function : https://nitratine.net/blog/post/asym
 # Gets the leys that are stored in a file in a string format
 def read_keys(): # Source of this function : https://nitratine.net/blog/post/asymmetric-encryption-and-decryption-in-python/
     print("Read keys : " + str(os.path.exists("crypto/private_key.pem")))
-    if not os.path.exists("crypto/private_key.pem") or not os.path.exists("public_key.pem"):
+    if not os.path.exists("crypto/private_key.pem") or not os.path.exists("crypto/public_key.pem"):
         print("Asymetric keys don't exist yet, creating them...")
         generate_keys() # Generates the public and private keys and store them into files
     
