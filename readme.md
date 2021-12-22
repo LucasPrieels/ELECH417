@@ -13,11 +13,13 @@ In the **server** part, there is :
   - Requires PostgreSQL installed
   - A database configuration file called "database.ini" with the following format 
 
-    ```[postgresql]
+    ```
+    [postgresql]
     host=localhost
     database=networks
     user=postgres      [Or any user]
-    password=* * * * * [ Password for this user]```
+    password=* * * * * [ Password for this user]
+    ```
     
     
   - Psycopg2 to interact with psql from Python
