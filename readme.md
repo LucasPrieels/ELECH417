@@ -42,9 +42,10 @@ In the client part, there is :
 3. Run the `ddl.sh` script. It will generate the `users` and `messages` tables. You can also call this script whenever you want to reset all the tables.
 4. Import the required modules :
 
+    ```
     pip install psycopg2  # Postgres
     pip install tk        # Tkinter
-    
+    ```
     
 5. Instanciate the server on socket 10000
 6. Instanciate a client
