@@ -13,16 +13,6 @@ from cryptography.exceptions import InvalidSignature
 clients = {} # List of clients connected with their username and their socket
 current_port = 0
 
-def parse_credentials_file(): # Read the credentials file to get the users and passwords
-    credentials = {}
-    f = open("credentials.txt", "r")
-    for line in f:
-        usr, pswd = (line.strip()).split(' ')
-        credentials[usr] = pswd
-    #print(credentials)
-    return credentials
-
-
 def create_new_socket(port):
     s = socket.socket() # Create a socket object
     host = socket.gethostname() # Current machine name
@@ -33,22 +23,23 @@ def create_new_socket(port):
     s.listen(5) # Max number of clients queued
     
     return s
-
-
+    
 def new_socket_client(client_connection): # Associate a new port number and socket to each new client
     global current_port
     if current_port == 0: # If the current port is not initialized, we give it a random value between 2000 and 3000
         current_port = random.randrange(2000, 3000)
     else:
         current_port += 1 # To give a different port number to each client
-    #print("Port : " + str(current_port))
+
     
     socket = create_new_socket(current_port)
     client_connection.send(str.encode(str(current_port))) # Send the port number to the client
     return socket
 
-
 def get_users_from_db() :
+    """
+    Returns a list of all users in DB
+    """
     global db_connection
     cur = db_connection.cursor()
     cur.execute("SELECT username FROM users ;")
@@ -65,32 +56,34 @@ def signup(main_connection):
     # Whatever the credentials are (valid or not), we create a cursor to query the DB
     cur = db_connection.cursor()
 
-    # credentials = parse_credentials_file()
-    # New version, using DB
-    credentials = get_users_from_db()
+    existing_users = get_users_from_db()
 
+    # Gets from client the following parameters for a registration
     usr, pswd, salt, public_key_string = bytes.decode(client_connection.recv(2048)).split(' ')
+
     print(pswd)
     print("Public key of user : " + public_key_string)
 
-    if usr in credentials: # User already exists
+    if usr in existing_users: # User already exists
         cur.close() 
         main_connection.send(str.encode("0"))
         print("Signup unsuccessful")
         return -1
     else:
+        # We can register
+
         # First, insert new created profile in DB
-        cur.execute("""
+        insertion_query = """
         INSERT INTO users(username, password, salt, created_on, last_login, client_public_key)
         VALUES ('{}','{}', '{}', now(), now(), '{}');
-        """.format(usr, pswd, salt, public_key_string))
+        """.format(usr, pswd, salt, public_key_string)
+        cur.execute(insertion_query)
 
         # Commit change to DB 
         db_connection.commit() 
-        print("User ajouté dans la DB ")
+        print("Added user to DB ")
         cur.close()
-        #f = open("credentials.txt", "a")
-        #f.write(usr + " " + pswd + "\n")
+
         
         # Then, send back message
         main_connection.send(str.encode("1"))
@@ -102,15 +95,19 @@ def signup(main_connection):
 def authentication(username, pw_hash) :
     """
     Gets the password from the DB and verifies it matches the entry
+    Here we assume username is in the DB, as it has been verified in a previous function.
     """
-    ## Here we assume username is in the DB
     global db_connection
+
+    # Execute query on DB
     cur = db_connection.cursor()
     query = """
     SELECT password FROM users WHERE username = '{}'
     """.format(username)
     cur.execute(query)
     res = cur.fetchone()
+
+    # Get hashed password
     pw_hash_db = res[0]
     
     print(username, pw_hash, pw_hash_db)
@@ -169,14 +166,18 @@ def get_salt_from_db(username):
 
 def login(main_connection):
     global clients 
-    credentials = get_users_from_db()
+    existing_users = get_users_from_db()
     
+    # Receive attempt username from client
     usr = bytes.decode(client_connection.recv(1024))
+
+    # Send to client the salt of this client, that is stored in DB
     client_connection.send(str.encode(str(get_salt_from_db(usr))))
     
+    # Get the password attempt from client
     pswd_hashed = bytes.decode(client_connection.recv(1024))
     
-    if usr not in credentials:
+    if usr not in existing_users:
         client_connection.send(str.encode("0"))
         print("Login unsucessful")
         return -1, -1
@@ -198,6 +199,7 @@ def login(main_connection):
         nonce = secrets.token_urlsafe(32) # Generates a random nonce
         main_connection.send(str.encode(nonce)) # And sends it to the client
         
+        # Receives encrypted signature from client
         encrypted_private_key_nonce = client_connection.recv(1024)
         
         public_key = transform_string_to_key(get_client_public_key(usr))
@@ -254,6 +256,7 @@ def display_history_of(id1, id2) :
 def server_listener(usr): # Listen to messages arriving from a client and displays them
 
     client_connection, client_listen_connection = clients[usr] # Gets the sending and listening connections for this user
+
     while True:
         recipient = bytes.decode(client_listen_connection.recv(10))
         print("Message for : " + recipient)
@@ -300,7 +303,7 @@ def server_listener(usr): # Listen to messages arriving from a client and displa
             print("Forwarding the symmetric key to " + usr)
             client_connection.send(encrypted_symm_key) # Retransmit the reply of the recipient to the client (the encrypted symmetric key or an error message)
         
-        elif recipient == "2HISTORY" :
+        elif recipient == "2HISTORY" : # Code to ask history from server
             print("Server has been asked to show history")
             # Collect usernames from the client
             username1 = bytes.decode(client_listen_connection.recv(64))
@@ -317,8 +320,8 @@ def server_listener(usr): # Listen to messages arriving from a client and displa
 
         elif recipient not in clients:
             client_listen_connection.send(str.encode("0")) # The user which need to be contacted doesn't exist or is not connected
-
         else:
+            # The client is a user and wants to send a message
             client_listen_connection.send(str.encode("1"))
             recipient_connection, recipient_listen_connection = clients[recipient]
             recipient_connection.send(str.encode(usr))
@@ -337,6 +340,14 @@ def server_listener(usr): # Listen to messages arriving from a client and displa
 
             print(data)
             recipient_connection.send(str.encode(data))
+
+
+
+####################
+
+# Server initialization
+
+
 main_socket = create_new_socket(10000) # Main socket, used by the server to send data and to listen to new connections. Port number is 10 000 by definition
 db_connection = connect()
 
@@ -357,7 +368,6 @@ while True:
             # Send to all clients the list of connected clients
 
             # Get list of all usernames : clients.keys()
-
 
             for username, values in clients.items() :
                 usernames_copy = list(clients.keys()).copy()
