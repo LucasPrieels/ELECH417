@@ -18,6 +18,15 @@ font = "Arial Black"
 disconnection = False # It is put to True when the user wants to be disconnected
 symm_keys = {}
 
+
+def disconnect():
+    global disconnection
+    server_listen_socket.send(str.encode("0DISCONNEC"))
+    disconnection = True
+    root.destroy()
+
+
+
 def center():
     global root
     # Gets the requested values of the height and widht.
@@ -106,7 +115,8 @@ def init_gui():
 
     pygame.init()
     pygame.mixer.music.load('audio/login.mp3')
-    #pygame.mixer.music.play(-1)
+    pygame.mixer.music.play(-1)
+    pygame.mixer.music.set_volume(0)
 
 
 
@@ -168,7 +178,6 @@ def login_gui():
 
     root.destroy()
     root = tk.Tk()
-    center()
 
     root.title('Login')
     root.geometry('300x300+220+170')
@@ -267,7 +276,7 @@ def chat_init_gui():
 
     pygame.mixer.music.stop()
     
-    user_to = ""
+    user_to = usr
     root.destroy()
     root = tk.Tk()
     root.title('Chat')
@@ -284,11 +293,12 @@ def chat_init_gui():
     text.configure(state=tk.DISABLED)
 
     msg_entry = tk.Entry(root, font=(font, 13), width=25)
+
     msg_entry.place(x=10, y=365)
-    
+
     resp = tk.Label(root, text='', font=(font, 10, 'bold'), bg='white')
     resp.place(x=10, y=250)
-    
+
     def receive():  # Listen from messages from the server and displays them
         while True:
             print("Listening for messages...")
@@ -297,6 +307,7 @@ def chat_init_gui():
             if disconnection: # If the user wants to be disconnected we stop receiving data for this user
                 print("Disconnection")
                 return
+
             if sender == "1NEW": # Create a new contact
                 #server_main_socket.send(str.encode("1")) # Confirmation
                 sender = bytes.decode(server_main_socket.recv(10))
@@ -315,12 +326,12 @@ def chat_init_gui():
                 # Translates "history" string into a list, and the stringified tuples into tuples
                 history_cleaned = ast.literal_eval(history)
                 refresh(text, history_cleaned)
-            
+
             elif sender == "3UPDATE" :
                 print("There is an update in the list of the logged-in users.")
                 logged_in_users = bytes.decode(server_main_socket.recv(2048))
                 logged_in_users_list = ast.literal_eval(logged_in_users)
-                
+
                 print(logged_in_users_list)
 
                 refresh_active_users(active_users, logged_in_users_list)
@@ -372,11 +383,18 @@ def chat_init_gui():
             print("message envoyé")
             msg_entry.delete(0, 'end')
 
+
     
     # Configuration of the send button
     sendbutton = tk.Button(root, font=(font, 10), text='Send', bd=0, bg='blue', fg='black', width=10,
                            command=send)
     sendbutton.place(x=300, y=365)
+
+    # Configuration of the disconnect button
+    disconnect_button = tk.Button(root, font=(font, 10), text='disconnect', bd=0, bg='blue', fg='red', width=10,
+                           command=disconnect)
+    disconnect_button.place(x=300, y=330)
+
 
 
     # Choice box containing active users
@@ -392,8 +410,8 @@ def chat_init_gui():
 
     active_users = tk.Listbox(root, height=8, width=20)
     active_users.place(x=400, y=230)
-    ########################################################@
 
+    ########################################################@
 
 
     def callback(event):
@@ -511,16 +529,16 @@ def read_keys(): # Source of this function : https://nitratine.net/blog/post/asy
 
 def refresh_active_users(active_users, users_list) :
 
-    
+
     active_users.delete('0', tk.END)
 
-    
+
     i = 0
     while i < len(users_list):
         active_users.insert(i + 1, users_list[i])
         i += 1
-    
-    return 
+
+    return
 
 
 def refresh(text, history):

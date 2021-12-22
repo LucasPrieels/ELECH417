@@ -22,6 +22,7 @@ def parse_credentials_file(): # Read the credentials file to get the users and p
     #print(credentials)
     return credentials
 
+
 def create_new_socket(port):
     s = socket.socket() # Create a socket object
     host = socket.gethostname() # Current machine name
@@ -32,7 +33,8 @@ def create_new_socket(port):
     s.listen(5) # Max number of clients queued
     
     return s
-    
+
+
 def new_socket_client(client_connection): # Associate a new port number and socket to each new client
     global current_port
     if current_port == 0: # If the current port is not initialized, we give it a random value between 2000 and 3000
@@ -45,6 +47,7 @@ def new_socket_client(client_connection): # Associate a new port number and sock
     client_connection.send(str.encode(str(current_port))) # Send the port number to the client
     return socket
 
+
 def get_users_from_db() :
     global db_connection
     cur = db_connection.cursor()
@@ -54,6 +57,7 @@ def get_users_from_db() :
         cred.append(user[0])
     cur.close()
     return cred
+
 
 def signup(main_connection):
     global db_connection
@@ -253,9 +257,30 @@ def server_listener(usr): # Listen to messages arriving from a client and displa
     while True:
         recipient = bytes.decode(client_listen_connection.recv(10))
         print("Message for : " + recipient)
-        if recipient == "" or recipient == ".": # Code for the client to be disconnected
+        if recipient == "0DISCONNEC": # Code for the client to be disconnected
             print("User " + usr + " disconnected")
             clients.pop(usr) # Remove the client from the list of active users
+
+            ##refresh list of active users
+
+            # Send to all clients the list of connected clients
+
+            # Get list of all usernames : clients.keys()
+
+            for username, values in clients.items():
+                usernames_copy = list(clients.keys()).copy()
+                usernames_copy.remove(username)
+
+                client_connection = values[0]
+
+                time.sleep(0.2)
+                # Informs the client socket that an update is coming
+                client_connection.send(str.encode("3UPDATE"))
+                time.sleep(1)
+                # Send to each user a list of all logged-in users BUT the concerned user itself
+                client_connection.send(str.encode(str(usernames_copy)))
+                time.sleep(0.2)
+
             break # Stop listening to this client
         elif recipient == "1NEW": # Code to connect to a new contact
             #client_listen_connection.send(str.encode("1"))
@@ -285,7 +310,6 @@ def server_listener(usr): # Listen to messages arriving from a client and displa
 
             history = display_history_of(id1, id2)
 
-            ## A toi de jouer nico
             time.sleep(0.1)
             client_connection.send(str.encode("2HISTORY"))
             time.sleep(0.1)
@@ -293,6 +317,7 @@ def server_listener(usr): # Listen to messages arriving from a client and displa
 
         elif recipient not in clients:
             client_listen_connection.send(str.encode("0")) # The user which need to be contacted doesn't exist or is not connected
+
         else:
             client_listen_connection.send(str.encode("1"))
             recipient_connection, recipient_listen_connection = clients[recipient]
