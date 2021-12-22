@@ -106,7 +106,7 @@ def init_gui():
 
     pygame.init()
     pygame.mixer.music.load('audio/login.mp3')
-    pygame.mixer.music.play(-1)
+    #pygame.mixer.music.play(-1)
 
 
 
@@ -267,7 +267,7 @@ def chat_init_gui():
 
     pygame.mixer.music.stop()
     
-    user_to = usr
+    user_to = ""
     root.destroy()
     root = tk.Tk()
     root.title('Chat')
@@ -284,12 +284,11 @@ def chat_init_gui():
     text.configure(state=tk.DISABLED)
 
     msg_entry = tk.Entry(root, font=(font, 13), width=25)
-
     msg_entry.place(x=10, y=365)
-
-
     
-
+    resp = tk.Label(root, text='', font=(font, 10, 'bold'), bg='white')
+    resp.place(x=10, y=250)
+    
     def receive():  # Listen from messages from the server and displays them
         while True:
             print("Listening for messages...")
@@ -347,7 +346,12 @@ def chat_init_gui():
 
     def send():  # Listen for the client's input and sends it to the server
         data = msg_entry.get()
-        if(data != "") :
+        if data == "":
+            resp.configure(text="Attempt to send empty messages", fg='red')
+        elif user_to == "":
+            resp.configure(text="Please select a receiver for this message", fg='red')
+        else:
+            resp.configure(text="", fg='red') # Erase previous error messages
             server_listen_socket.send(str.encode(user_to))
             time.sleep(0.1) # to avoid merge of user and data
             f = Fernet(symm_keys[user_to])
@@ -367,8 +371,6 @@ def chat_init_gui():
 
             print("message envoyé")
             msg_entry.delete(0, 'end')
-        else :
-            print("Attempt to send empty messages")
 
     
     # Configuration of the send button
