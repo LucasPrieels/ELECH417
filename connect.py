@@ -16,15 +16,6 @@ def connect():
         print("Connected !")
         # create a cursor
         cur = conn.cursor()
-	#     # execute a statement
-        test = cur.execute("""
-            SELECT *
-            FROM users ;
-        """)
-
-
-	# # # close the communication with the PostgreSQL
-        cur.close()
     except (Exception, psycopg2.DatabaseError) as error:
         print(error)
     finally:
