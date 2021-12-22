@@ -74,6 +74,7 @@ def check_credentials(usr, pswd): # Check the credentials are valid
     return True
 
 def generate_symmetric_key(usr, remote_usr, public_key_string):
+    print("Generating key")
     # Generates the symmetric key for the connection with this user
     symm_key = Fernet.generate_key()
     #print("Symmetric key for this connection : " + bytes.decode(symm_key))
@@ -99,7 +100,8 @@ def generate_symmetric_key(usr, remote_usr, public_key_string):
     # Append this key to the end of the file
     with open("crypto/symmetric_keys_" + usr + ".txt", "a") as f:
         f.write(remote_usr + " " + bytes.decode(symm_key) + "\n")
-        symm_keys[usr] = symm_key
+        print(remote_usr + " " + bytes.decode(symm_key) + "\n")
+        symm_keys[remote_usr] = symm_key
         
     return encrypted_symm_key
     
@@ -229,6 +231,7 @@ def create_symmetric_key(user): # Creates a new symmetric key for the conversati
     with open("crypto/symmetric_keys_" + usr + ".txt", "a") as f:
         f.write(user + " " + symm_key + "\n") # Stores the symmetric key
         symm_keys[user] = symm_key
+        print(symm_keys)
 
 
 ########## GUI ##########
@@ -281,7 +284,6 @@ def refresh(text, history): # Refresh the GUI
         time = message[3]
 
         f = Fernet(key)
-        print("content : " + content)
         decrypted_message = bytes.decode(f.decrypt(str.encode(content)))
 
         text.insert(tk.INSERT, '[from ' + from_username + ' at ' + time + '] ', 'name')
@@ -534,6 +536,7 @@ def receive_messages(text, active_users):  # Listen from messages from the serve
             return
 
         if sender == "1NEW": # Create a new contact
+            print("Creating contact")
             #server_main_socket.send(str.encode("1")) # Confirmation
             sender = bytes.decode(server_main_socket.recv(10))
             public_key = bytes.decode(server_main_socket.recv(1024))
@@ -591,7 +594,6 @@ def send_message(resp, text, data, msg_entry):   # Function called when the user
         server_listen_socket.send(str.encode(user_to))
         time.sleep(0.1) # to avoid merge of user and data
         f = Fernet(symm_keys[user_to])
-        print("Symmetric key for user " + user_to + " : " + symm_keys[user_to])
         print("Message to encrypt : " + data)
         encrypted_message = f.encrypt(str.encode(data))
         print("Message encrypted : ", end='')
