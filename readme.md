@@ -32,6 +32,8 @@ In the client part, there is :
 - GUI 
   - Requires Python's "Tkinter" module
   - Allows selecting active users, send them messages, and disconnect from the server
+
+- If you desire to connect to a **remote server**, make sure you change the IP in `client.py` from `-1` to the server's IP
 - Security aspects (detailed in the report)
 
 ## How to
